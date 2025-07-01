@@ -1,5 +1,5 @@
-
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,11 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
+import { UserCircle } from "lucide-react";
 
 const Profile = () => {
   const [milesBalance] = useState(1250);
   const [referralLink] = useState("https://greensky.com/ref/user123");
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   const copyReferralLink = () => {
     navigator.clipboard.writeText(referralLink);
@@ -36,11 +38,9 @@ const Profile = () => {
         {/* Profile Header */}
         <div className="text-center mb-8">
           <div className="inline-block relative mb-4">
-            <img 
-              src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&h=120&fit=crop&crop=face" 
-              alt="Profile"
-              className="w-24 h-24 rounded-full border-4 border-white shadow-lg"
-            />
+            <div className="w-24 h-24 rounded-full border-4 border-white shadow-lg bg-gray-100 flex items-center justify-center">
+              <UserCircle className="w-20 h-20 text-gray-400" />
+            </div>
             <div className="absolute -bottom-2 -right-2 bg-gradient-primary text-white rounded-full w-8 h-8 flex items-center justify-center text-sm font-bold">
               ✨
             </div>
@@ -48,7 +48,7 @@ const Profile = () => {
           <h1 className="font-heading font-bold text-2xl md:text-3xl text-gray-900 mb-2">
             Olá, Aventureiro! 👋
           </h1>
-          <p className="text-gray-600">Sua jornada Green Sky até agora</p>
+          <Button className="mt-2 bg-green-600 hover:bg-green-700 text-white font-semibold" onClick={() => navigate("/editar-perfil")}>Completar Perfil</Button>
         </div>
 
         {/* Miles Balance */}

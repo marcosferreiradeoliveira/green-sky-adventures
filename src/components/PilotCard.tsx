@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -6,7 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 
 interface PilotCardProps {
   pilot: {
-    id: number;
+    id: string;
     name: string;
     school: string;
     photo: string;
@@ -74,7 +73,7 @@ const PilotCard = ({ pilot }: PilotCardProps) => {
 
         <Button 
           onClick={handleContact}
-          className="w-full bg-gradient-sunset hover:opacity-90 transition-opacity font-semibold"
+          className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold transition-colors shadow mt-4"
           size="lg"
         >
           Entrar em Contato

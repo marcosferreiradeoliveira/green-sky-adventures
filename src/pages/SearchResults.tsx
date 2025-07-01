@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import Header from "@/components/Header";
@@ -7,48 +6,77 @@ import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
+import { collection, onSnapshot, query, where } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+
+interface Pilot {
+  id: string;
+  name: string;
+  school: string;
+  photo: string;
+  type: string;
+  location: string;
+  price: string;
+  rating: number;
+  experience: string;
+}
 
 const SearchResults = () => {
   const [searchParams] = useSearchParams();
   const location = searchParams.get('location') || '';
   const [searchTerm, setSearchTerm] = useState(location);
+  const [pilots, setPilots] = useState<Pilot[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Mock pilots data
-  const pilots = [
-    {
-      id: 1,
-      name: "Carlos Silva",
-      school: "Voo Livre Rio",
-      photo: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=300&h=300&fit=crop&crop=face",
-      type: "Parapente",
-      location: "Rio de Janeiro, RJ",
-      price: "A partir de R$ 800",
-      rating: 4.9,
-      experience: "15 anos"
-    },
-    {
-      id: 2,
-      name: "Maria Santos",
-      school: "Asa Delta SP",
-      photo: "https://images.unsplash.com/photo-1494790108755-2616b612b789?w=300&h=300&fit=crop&crop=face",
-      type: "Asa Delta",
-      location: "São Paulo, SP",
-      price: "A partir de R$ 650",
-      rating: 4.8,
-      experience: "12 anos"
-    },
-    {
-      id: 3,
-      name: "João Pereira",
-      school: "Aventura Vertical",
-      photo: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&h=300&fit=crop&crop=face",
-      type: "Parapente",
-      location: "Minas Gerais, MG",
-      price: "A partir de R$ 750",
-      rating: 4.7,
-      experience: "10 anos"
+  useEffect(() => {
+    setLoading(true);
+    let q = collection(db, "pilots");
+    // Filtro simples por localização ou nome
+    if (searchTerm) {
+      // Firestore não suporta contains em múltiplos campos, então filtramos no client
+      onSnapshot(q, (snapshot) => {
+        const all = snapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            name: data.name || '',
+            school: data.school || '',
+            photo: data.photo || '',
+            type: data.type || '',
+            location: data.location || '',
+            price: data.price || '',
+            rating: typeof data.rating === 'number' ? data.rating : 0,
+            experience: data.experience || ''
+          };
+        });
+        setPilots(
+          all.filter(pilot =>
+            pilot.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            pilot.name.toLowerCase().includes(searchTerm.toLowerCase())
+          )
+        );
+        setLoading(false);
+      });
+    } else {
+      onSnapshot(q, (snapshot) => {
+        setPilots(snapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            name: data.name || '',
+            school: data.school || '',
+            photo: data.photo || '',
+            type: data.type || '',
+            location: data.location || '',
+            price: data.price || '',
+            rating: typeof data.rating === 'number' ? data.rating : 0,
+            experience: data.experience || ''
+          };
+        }));
+        setLoading(false);
+      });
     }
-  ];
+  }, [searchTerm]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -87,13 +115,19 @@ const SearchResults = () => {
 
         {/* Results Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
-          {pilots.map((pilot) => (
-            <PilotCard key={pilot.id} pilot={pilot} />
-          ))}
+          {loading ? (
+            <div className="col-span-full text-center text-gray-500">Carregando pilotos...</div>
+          ) : pilots.length === 0 ? (
+            <div className="col-span-full text-center text-gray-500">Nenhum piloto encontrado.</div>
+          ) : (
+            pilots.map((pilot) => (
+              <PilotCard key={pilot.id} pilot={pilot} />
+            ))
+          )}
         </div>
 
-        {/* Load More */}
-        <div className="text-center">
+        {/* Load More (desabilitado para Firestore realtime) */}
+        {/* <div className="text-center">
           <Button 
             variant="outline" 
             size="lg"
@@ -101,7 +135,7 @@ const SearchResults = () => {
           >
             Carregar Mais Pilotos
           </Button>
-        </div>
+        </div> */}
       </main>
 
       <Footer />
