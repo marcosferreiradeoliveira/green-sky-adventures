@@ -4,11 +4,23 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { auth } from "@/lib/firebase";
 import { onAuthStateChanged, signOut, User } from "firebase/auth";
+import {
+  AlertDialog,
+  AlertDialogTrigger,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogAction,
+  AlertDialogCancel,
+} from "@/components/ui/alert-dialog";
 
 const Header = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [showLogoutDialog, setShowLogoutDialog] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, setUser);
@@ -18,6 +30,7 @@ const Header = () => {
   const handleLogout = async () => {
     await signOut(auth);
     setMenuOpen(false);
+    setShowLogoutDialog(false);
     navigate("/");
   };
 
@@ -61,12 +74,28 @@ const Header = () => {
                     >
                       Meu Perfil
                     </button>
-                    <button
-                      className="block w-full text-left px-4 py-2 hover:bg-gray-100 text-red-600"
-                      onClick={handleLogout}
-                    >
-                      Sair
-                    </button>
+                    <AlertDialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
+                      <AlertDialogTrigger asChild>
+                        <button
+                          className="block w-full text-left px-4 py-2 hover:bg-gray-100 text-red-600"
+                          onClick={() => setShowLogoutDialog(true)}
+                        >
+                          Sair
+                        </button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Deseja realmente sair?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Você será deslogado da sua conta e precisará fazer login novamente para acessar funcionalidades exclusivas.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                          <AlertDialogAction onClick={handleLogout}>Sair</AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </div>
                 )}
               </div>

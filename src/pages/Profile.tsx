@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
@@ -8,12 +8,36 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { UserCircle } from "lucide-react";
+import { auth, db } from "@/lib/firebase";
+import { doc, getDoc } from "firebase/firestore";
+import { onAuthStateChanged, User } from "firebase/auth";
 
 const Profile = () => {
   const [milesBalance] = useState(1250);
   const [referralLink] = useState("https://greensky.com/ref/user123");
   const { toast } = useToast();
   const navigate = useNavigate();
+  const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<any>(null);
+  const [loadingProfile, setLoadingProfile] = useState(true);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (u) => {
+      setUser(u);
+      if (u) {
+        setLoadingProfile(true);
+        const docRef = doc(db, "users", u.uid);
+        const snap = await getDoc(docRef);
+        if (snap.exists()) {
+          setProfile(snap.data());
+        } else {
+          setProfile(null);
+        }
+        setLoadingProfile(false);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
 
   const copyReferralLink = () => {
     navigator.clipboard.writeText(referralLink);
@@ -38,16 +62,39 @@ const Profile = () => {
         {/* Profile Header */}
         <div className="text-center mb-8">
           <div className="inline-block relative mb-4">
-            <div className="w-24 h-24 rounded-full border-4 border-white shadow-lg bg-gray-100 flex items-center justify-center">
-              <UserCircle className="w-20 h-20 text-gray-400" />
-            </div>
+            {loadingProfile ? (
+              <div className="w-24 h-24 rounded-full border-4 border-white shadow-lg bg-gray-100 flex items-center justify-center animate-pulse">
+                <UserCircle className="w-20 h-20 text-gray-300" />
+              </div>
+            ) : profile && profile.photo ? (
+              <img
+                src={profile.photo}
+                alt="Profile"
+                className="w-24 h-24 rounded-full border-4 border-white shadow-lg object-cover"
+              />
+            ) : (
+              <div className="w-24 h-24 rounded-full border-4 border-white shadow-lg bg-gray-100 flex items-center justify-center">
+                <UserCircle className="w-20 h-20 text-gray-400" />
+              </div>
+            )}
             <div className="absolute -bottom-2 -right-2 bg-gradient-primary text-white rounded-full w-8 h-8 flex items-center justify-center text-sm font-bold">
               ✨
             </div>
           </div>
           <h1 className="font-heading font-bold text-2xl md:text-3xl text-gray-900 mb-2">
-            Olá, Aventureiro! 👋
+            {loadingProfile
+              ? "Carregando..."
+              : profile && profile.firstName
+                ? `${profile.firstName} ${profile.lastName}`
+                : "Olá, Aventureiro! 👋"}
           </h1>
+          {profile && (
+            <div className="text-gray-600 text-sm mb-2">
+              {profile.city && profile.state && profile.country && (
+                <span>{profile.city}, {profile.state}, {profile.country}</span>
+              )}
+            </div>
+          )}
           <Button className="mt-2 bg-green-600 hover:bg-green-700 text-white font-semibold" onClick={() => navigate("/editar-perfil")}>Completar Perfil</Button>
         </div>
 

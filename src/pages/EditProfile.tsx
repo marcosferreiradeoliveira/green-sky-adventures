@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -6,6 +6,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { UserCircle } from "lucide-react";
+import { auth, db } from "@/lib/firebase";
+import { doc, setDoc, getDoc } from "firebase/firestore";
+import { onAuthStateChanged, User } from "firebase/auth";
 
 const EditProfile = () => {
   const [form, setForm] = useState({
@@ -16,26 +19,36 @@ const EditProfile = () => {
     state: "",
     country: ""
   });
-  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState("");
   const [error, setError] = useState("");
+  const [user, setUser] = useState<User | null>(null);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (u) => {
+      setUser(u);
+      if (u) {
+        const docRef = doc(db, "users", u.uid);
+        const snap = await getDoc(docRef);
+        if (snap.exists()) {
+          const data = snap.data();
+          setForm({
+            photo: data.photo || "",
+            firstName: data.firstName || "",
+            lastName: data.lastName || "",
+            city: data.city || "",
+            state: data.state || "",
+            country: data.country || ""
+          });
+        }
+      }
+    });
+    return () => unsubscribe();
+  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value });
-  };
-
-  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPhotoPreview(reader.result as string);
-        setForm({ ...form, photo: reader.result as string });
-      };
-      reader.readAsDataURL(file);
-    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -43,11 +56,19 @@ const EditProfile = () => {
     setLoading(true);
     setSuccess("");
     setError("");
-    // Aqui você pode integrar com Firestore ou Auth para salvar os dados
-    setTimeout(() => {
+    if (!user) {
+      setError("Usuário não autenticado");
       setLoading(false);
+      return;
+    }
+    try {
+      await setDoc(doc(db, "users", user.uid), form, { merge: true });
       setSuccess("Perfil atualizado com sucesso!");
-    }, 1000);
+    } catch (err: any) {
+      setError(err.message || "Erro ao salvar perfil");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -59,15 +80,15 @@ const EditProfile = () => {
             <h2 className="text-2xl font-bold mb-6 text-center">Completar Perfil</h2>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="flex flex-col items-center mb-4">
-                {photoPreview ? (
-                  <img src={photoPreview} alt="Preview" className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-lg mb-2" />
+                {form.photo ? (
+                  <img src={form.photo} alt="Preview" className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-lg mb-2" />
                 ) : (
                   <div className="w-24 h-24 rounded-full border-4 border-white shadow-lg bg-gray-100 flex items-center justify-center mb-2">
                     <UserCircle className="w-20 h-20 text-gray-400" />
                   </div>
                 )}
-                <input type="file" accept="image/*" onChange={handlePhotoChange} className="mt-2" />
               </div>
+              <Input name="photo" placeholder="URL da foto de perfil" value={form.photo} onChange={handleChange} />
               <Input name="firstName" placeholder="Nome" value={form.firstName} onChange={handleChange} required />
               <Input name="lastName" placeholder="Sobrenome" value={form.lastName} onChange={handleChange} required />
               <Input name="city" placeholder="Cidade" value={form.city} onChange={handleChange} required />
