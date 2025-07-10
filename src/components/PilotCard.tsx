@@ -2,6 +2,10 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { auth, db } from "@/lib/firebase";
+import { addDoc, collection, doc, updateDoc, arrayUnion, serverTimestamp } from "firebase/firestore";
+import { onAuthStateChanged, User } from "firebase/auth";
+import { useState, useEffect } from "react";
 
 interface PilotCardProps {
   pilot: {
@@ -14,18 +18,52 @@ interface PilotCardProps {
     price: string;
     rating: number;
     experience: string;
+    whatsapp?: string;
   };
 }
 
 const PilotCard = ({ pilot }: PilotCardProps) => {
   const { toast } = useToast();
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
 
-  const handleContact = () => {
-    toast({
-      title: "Contato Iniciado! 🚁",
-      description: `Você será direcionado para conversar com ${pilot.name}. Confirme seu voo e ganhe milhas bônus!`,
-      duration: 5000,
-    });
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, setCurrentUser);
+    return () => unsubscribe();
+  }, []);
+
+  const handleContact = async () => {
+    if (pilot.whatsapp) {
+      try {
+        const contactData = {
+          userId: currentUser ? currentUser.uid : null,
+          pilotId: pilot.id,
+          timestamp: serverTimestamp(),
+          realized: false,
+        };
+        // Cria o contato e pega o id
+        const contactRef = await addDoc(collection(db, "contacts"), contactData);
+        // Salva apenas o id do contato nos arrays de contacts
+        await updateDoc(doc(db, "pilots", pilot.id), {
+          contacts: arrayUnion(contactRef.id)
+        });
+        if (currentUser) {
+          await updateDoc(doc(db, "users", currentUser.uid), {
+            contacts: arrayUnion(contactRef.id)
+          });
+        }
+      } catch (err) {
+        toast({ title: "Erro ao registrar contato", description: String(err), duration: 5000 });
+      }
+      const msg = encodeURIComponent(`Olá ${pilot.name}, encontrei seu perfil no Green Sky e gostaria de saber mais sobre voos!`);
+      const phone = pilot.whatsapp.replace(/\D/g, "");
+      window.open(`https://wa.me/${phone}?text=${msg}`, "_blank");
+    } else {
+      toast({
+        title: "Contato Iniciado! 🚁",
+        description: `Você será direcionado para conversar com ${pilot.name}. Confirme seu voo e ganhe milhas bônus!`,
+        duration: 5000,
+      });
+    }
   };
 
   return (

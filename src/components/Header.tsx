@@ -2,8 +2,9 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { auth } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged, signOut, User } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
 import {
   AlertDialog,
   AlertDialogTrigger,
@@ -19,6 +20,7 @@ import {
 const Header = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<any>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
 
@@ -26,6 +28,16 @@ const Header = () => {
     const unsubscribe = onAuthStateChanged(auth, setUser);
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    const fetchProfile = async () => {
+      const docRef = doc(db, "users", user.uid);
+      const snap = await getDoc(docRef);
+      if (snap.exists()) setProfile(snap.data());
+    };
+    fetchProfile();
+  }, [user]);
 
   const handleLogout = async () => {
     await signOut(auth);
@@ -38,7 +50,7 @@ const Header = () => {
     <header className="bg-white/95 backdrop-blur-md border-b border-gray-200 sticky top-0 z-50">
       <div className="container mx-auto px-4 py-4">
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-2 cursor-pointer" onClick={() => navigate("/")}>
             <div className="w-8 h-8 bg-gradient-primary rounded-full flex items-center justify-center">
               <span className="text-white font-bold text-sm">GS</span>
             </div>
@@ -49,7 +61,10 @@ const Header = () => {
             <a href="/busca" className="text-gray-600 hover:text-greensky-600 transition-colors">
               Encontrar Pilotos
             </a>
-            <a href="/perfil" className="text-gray-600 hover:text-greensky-600 transition-colors">
+            <a
+              className="text-gray-600 hover:text-greensky-600 transition-colors cursor-pointer"
+              onClick={e => { e.preventDefault(); navigate("/minhas-milhas"); }}
+            >
               Minhas Milhas
             </a>
             <a href="#impacto" className="text-gray-600 hover:text-greensky-600 transition-colors">
@@ -64,15 +79,15 @@ const Header = () => {
             {user ? (
               <div className="relative">
                 <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white font-semibold transition-colors shadow" onClick={() => setMenuOpen((v) => !v)}>
-                  {user.email?.split("@")[0] || "Perfil"}
+                  {profile && profile.firstName ? profile.firstName : (user.email?.split("@")[0] || "Perfil")}
                 </Button>
                 {menuOpen && (
                   <div className="absolute right-0 mt-2 w-40 bg-white border rounded shadow-lg z-50">
                     <button
                       className="block w-full text-left px-4 py-2 hover:bg-gray-100"
-                      onClick={() => { setMenuOpen(false); navigate("/perfil"); }}
+                      onClick={() => { setMenuOpen(false); navigate("/editar-perfil"); }}
                     >
-                      Meu Perfil
+                      Editar Perfil
                     </button>
                     <AlertDialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
                       <AlertDialogTrigger asChild>

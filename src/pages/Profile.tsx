@@ -11,6 +11,7 @@ import { UserCircle } from "lucide-react";
 import { auth, db } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
 import { onAuthStateChanged, User } from "firebase/auth";
+import Register from "./Register";
 
 const Profile = () => {
   const [milesBalance] = useState(1250);
@@ -20,6 +21,7 @@ const Profile = () => {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<any>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
+  const [redirecting, setRedirecting] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
@@ -29,15 +31,24 @@ const Profile = () => {
         const docRef = doc(db, "users", u.uid);
         const snap = await getDoc(docRef);
         if (snap.exists()) {
-          setProfile(snap.data());
+          const data = snap.data();
+          setProfile(data);
+          if (!data.firstName || !data.lastName || !data.photo) {
+            setRedirecting(true);
+            navigate("/editar-perfil");
+          }
         } else {
           setProfile(null);
+          setRedirecting(true);
+          navigate("/editar-perfil");
         }
+        setLoadingProfile(false);
+      } else {
         setLoadingProfile(false);
       }
     });
     return () => unsubscribe();
-  }, []);
+  }, [navigate]);
 
   const copyReferralLink = () => {
     navigator.clipboard.writeText(referralLink);
@@ -53,6 +64,12 @@ const Profile = () => {
       description: "Esta funcionalidade estará disponível em breve.",
     });
   };
+
+  if (redirecting) return null;
+
+  if (!user && !loadingProfile) {
+    return <Register />;
+  }
 
   return (
     <div className="min-h-screen bg-gradient-hero">
@@ -82,20 +99,23 @@ const Profile = () => {
             </div>
           </div>
           <h1 className="font-heading font-bold text-2xl md:text-3xl text-gray-900 mb-2">
-            {loadingProfile
-              ? "Carregando..."
-              : profile && profile.firstName
-                ? `${profile.firstName} ${profile.lastName}`
+            {profile && profile.firstName
+              ? `${profile.firstName} ${profile.lastName}`
+              : loadingProfile
+                ? "Carregando..."
                 : "Olá, Aventureiro! 👋"}
           </h1>
           {profile && (
-            <div className="text-gray-600 text-sm mb-2">
+            <div className="text-gray-600 text-sm mb-2 flex flex-col items-center gap-1">
+              {profile.email && (
+                <span><b>Email:</b> {profile.email}</span>
+              )}
               {profile.city && profile.state && profile.country && (
-                <span>{profile.city}, {profile.state}, {profile.country}</span>
+                <span><b>Localização:</b> {profile.city}, {profile.state}, {profile.country}</span>
               )}
             </div>
           )}
-          <Button className="mt-2 bg-green-600 hover:bg-green-700 text-white font-semibold" onClick={() => navigate("/editar-perfil")}>Completar Perfil</Button>
+          <Button className="mt-2 bg-green-600 hover:bg-green-700 text-white font-semibold" onClick={() => navigate("/editar-perfil")}>Editar Perfil</Button>
         </div>
 
         {/* Miles Balance */}

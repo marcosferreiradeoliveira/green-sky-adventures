@@ -19,6 +19,7 @@ interface Pilot {
   price: string;
   rating: number;
   experience: string;
+  whatsapp?: string;
 }
 
 const SearchResults = () => {
@@ -46,7 +47,8 @@ const SearchResults = () => {
             location: data.location || '',
             price: data.price || '',
             rating: typeof data.rating === 'number' ? data.rating : 0,
-            experience: data.experience || ''
+            experience: data.experience || '',
+            whatsapp: data.whatsapp || '',
           };
         });
         setPilots(
@@ -70,7 +72,8 @@ const SearchResults = () => {
             location: data.location || '',
             price: data.price || '',
             rating: typeof data.rating === 'number' ? data.rating : 0,
-            experience: data.experience || ''
+            experience: data.experience || '',
+            whatsapp: data.whatsapp || '',
           };
         }));
         setLoading(false);

@@ -13,6 +13,7 @@ import Register from "./pages/Register";
 import ForgotPassword from "./pages/ForgotPassword";
 import AddPilot from "./pages/AddPilot";
 import EditProfile from "./pages/EditProfile";
+import MyFlights from "./pages/MyFlights";
 
 const queryClient = new QueryClient();
 
@@ -32,6 +33,7 @@ const App = () => (
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/add-pilot" element={<AddPilot />} />
           <Route path="/editar-perfil" element={<EditProfile />} />
+          <Route path="/minhas-milhas" element={<MyFlights />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
