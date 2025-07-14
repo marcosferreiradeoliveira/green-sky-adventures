@@ -104,6 +104,9 @@ const Profile = () => {
               : loadingProfile
                 ? "Carregando..."
                 : "Olá, Aventureiro! 👋"}
+            {profile && profile.pilot && (
+              <span className="ml-2 inline-block bg-green-100 text-green-800 text-xs font-semibold px-2 py-1 rounded align-middle">Perfil de Piloto</span>
+            )}
           </h1>
           {profile && (
             <div className="text-gray-600 text-sm mb-2 flex flex-col items-center gap-1">
@@ -115,7 +118,10 @@ const Profile = () => {
               )}
             </div>
           )}
-          <Button className="mt-2 bg-green-600 hover:bg-green-700 text-white font-semibold" onClick={() => navigate("/editar-perfil")}>Editar Perfil</Button>
+          <Button className="mt-2 bg-green-600 hover:bg-green-700 text-white font-semibold mr-2" onClick={() => navigate("/editar-perfil")}>Editar Perfil</Button>
+          {profile && profile.pilot && (
+            <Button className="mt-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold" onClick={() => navigate("/editar-oferta")}>Editar Oferta</Button>
+          )}
         </div>
 
         {/* Miles Balance */}

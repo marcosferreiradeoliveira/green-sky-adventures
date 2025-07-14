@@ -210,7 +210,7 @@ const MyFlights = () => {
                         <div className="text-gray-500 text-xs mt-1">Contato em: {c.timestamp && c.timestamp.toDate ? c.timestamp.toDate().toLocaleString() : "-"}</div>
                       </div>
                       <div className="w-full flex justify-center mt-2">
-                        {c.realized ? (
+                        {c.confirmed ? (
                           <span className="text-green-600 font-semibold">Vôo confirmado!</span>
                         ) : (
                           <AlertDialog open={confirmPilotId === c.id} onOpenChange={open => setConfirmPilotId(open ? c.id : null)}>
@@ -229,8 +229,8 @@ const MyFlights = () => {
                               <AlertDialogFooter>
                                 <AlertDialogCancel>Cancelar</AlertDialogCancel>
                                 <AlertDialogAction onClick={async () => {
-                                  await updateDoc(doc(db, "contacts", c.id), { realized: true });
-                                  setPilotContacts(prev => prev.map(x => x.id === c.id ? { ...x, realized: true } : x));
+                                  await updateDoc(doc(db, "contacts", c.id), { confirmed: true });
+                                  setPilotContacts(prev => prev.map(x => x.id === c.id ? { ...x, confirmed: true } : x));
                                   setConfirmPilotId(null);
                                 }}>Confirmar</AlertDialogAction>
                               </AlertDialogFooter>

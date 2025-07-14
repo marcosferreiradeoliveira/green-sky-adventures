@@ -80,6 +80,9 @@ const Header = () => {
               <div className="relative">
                 <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white font-semibold transition-colors shadow" onClick={() => setMenuOpen((v) => !v)}>
                   {profile && profile.firstName ? profile.firstName : (user.email?.split("@")[0] || "Perfil")}
+                  {profile && profile.pilot && (
+                    <span className="ml-2 inline-block bg-green-100 text-green-800 text-xs font-semibold px-2 py-1 rounded align-middle">Piloto</span>
+                  )}
                 </Button>
                 {menuOpen && (
                   <div className="absolute right-0 mt-2 w-40 bg-white border rounded shadow-lg z-50">
@@ -89,6 +92,14 @@ const Header = () => {
                     >
                       Editar Perfil
                     </button>
+                    {profile && profile.pilot && (
+                      <button
+                        className="block w-full text-left px-4 py-2 hover:bg-gray-100"
+                        onClick={() => { setMenuOpen(false); navigate("/editar-oferta"); }}
+                      >
+                        Editar Oferta
+                      </button>
+                    )}
                     <AlertDialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
                       <AlertDialogTrigger asChild>
                         <button

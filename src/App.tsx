@@ -14,6 +14,7 @@ import ForgotPassword from "./pages/ForgotPassword";
 import AddPilot from "./pages/AddPilot";
 import EditProfile from "./pages/EditProfile";
 import MyFlights from "./pages/MyFlights";
+import EditarOferta from "./pages/EditarOferta";
 
 const queryClient = new QueryClient();
 
@@ -34,6 +35,7 @@ const App = () => (
           <Route path="/add-pilot" element={<AddPilot />} />
           <Route path="/editar-perfil" element={<EditProfile />} />
           <Route path="/minhas-milhas" element={<MyFlights />} />
+          <Route path="/editar-oferta" element={<EditarOferta />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
