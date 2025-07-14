@@ -10,6 +10,7 @@ import { useState, useEffect } from "react";
 interface PilotCardProps {
   pilot: {
     id: string;
+    pilotId?: string;
     name: string;
     school: string;
     photo: string;
@@ -36,7 +37,7 @@ const PilotCard = ({ pilot }: PilotCardProps) => {
       try {
         const contactData = {
           userId: currentUser ? currentUser.uid : null,
-          pilotId: pilot.id,
+          pilotId: pilot.pilotId || pilot.id,
           timestamp: serverTimestamp(),
           realized: false,
         };

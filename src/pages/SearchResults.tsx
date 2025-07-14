@@ -40,6 +40,7 @@ const SearchResults = () => {
           const data = doc.data();
           return {
             id: doc.id,
+            pilotId: data.pilotId || '',
             name: data.name || '',
             school: data.school || '',
             photo: data.photo || '',
@@ -65,6 +66,7 @@ const SearchResults = () => {
           const data = doc.data();
           return {
             id: doc.id,
+            pilotId: data.pilotId || '',
             name: data.name || '',
             school: data.school || '',
             photo: data.photo || '',
