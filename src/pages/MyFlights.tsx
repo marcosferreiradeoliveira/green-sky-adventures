@@ -19,6 +19,7 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
 } from "@/components/ui/alert-dialog";
+import { Star } from "lucide-react";
 
 const MyFlights = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -32,6 +33,15 @@ const MyFlights = () => {
   const [pilotContacts, setPilotContacts] = useState<any[]>([]);
   const [loadingPilotContacts, setLoadingPilotContacts] = useState(true);
   const [confirmPilotId, setConfirmPilotId] = useState<string | null>(null);
+  const [pilotContactsCount, setPilotContactsCount] = useState<number | null>(null);
+
+  const [realizedFlightsCount, setRealizedFlightsCount] = useState(0);
+  const [pilotRating, setPilotRating] = useState<number | null>(null);
+  const [clientes, setClientes] = useState<{ name: string; email: string }[]>([]);
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const [showRating, setShowRating] = useState<string | null>(null); // contactId
+  const [ratingValue, setRatingValue] = useState(0);
+  const [ratingText, setRatingText] = useState("");
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
@@ -47,11 +57,21 @@ const MyFlights = () => {
         const contactsArr = [];
         for (const c of snapContacts.docs) {
           const data = c.data();
-          // Busca dados do piloto
           let pilot = null;
           if (data.pilotId) {
-            const pilotSnap = await getDoc(doc(db, "pilots", data.pilotId));
-            if (pilotSnap.exists()) pilot = pilotSnap.data();
+            console.log('[DEBUG] Buscando piloto para pilotId:', data.pilotId);
+            // Buscar pelo campo pilotId, não pelo id do documento
+            const qPilot = query(collection(db, "pilots"), where("pilotId", "==", data.pilotId));
+            const snapPilot = await getDocs(qPilot);
+            if (!snapPilot.empty) {
+              const pilotDoc = snapPilot.docs[0];
+              pilot = pilotDoc.data();
+              console.log('[DEBUG] Piloto encontrado:', pilot);
+            } else {
+              console.warn('[DEBUG] Nenhum piloto encontrado para pilotId:', data.pilotId);
+            }
+          } else {
+            console.warn('[DEBUG] Contato sem pilotId:', data);
           }
           contactsArr.push({ ...data, id: c.id, pilot });
         }
@@ -86,6 +106,61 @@ const MyFlights = () => {
     fetchPilotContacts();
   }, [user, profile]);
 
+  useEffect(() => {
+    if (!user || !profile || !profile.pilot) return;
+    const fetchRealizedFlights = async () => {
+      console.log('UID do piloto logado:', user.uid);
+      const q = query(collection(db, "contacts"), where("pilotId", "==", user.uid));
+      const snap = await getDocs(q);
+      snap.docs.forEach(docSnap => {
+        const data = docSnap.data();
+        console.log('Contato:', { id: docSnap.id, pilotId: data.pilotId, realized: data.realized });
+      });
+      const realizedCount = snap.docs.filter(doc => doc.data().realized === true).length;
+      setRealizedFlightsCount(realizedCount);
+    };
+    fetchRealizedFlights();
+  }, [user, profile]);
+
+  useEffect(() => {
+    if (!user || !profile || !profile.pilot) return;
+    const fetchPilotInfo = async () => {
+      const q = query(collection(db, "pilots"), where("uid", "==", user.uid));
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        const data = snap.docs[0].data();
+        setPilotRating(typeof data.rating === 'number' ? data.rating : null);
+        setPilotContactsCount(Array.isArray(data.contacts) ? data.contacts.length : 0);
+      } else {
+        setPilotRating(null);
+        setPilotContactsCount(null);
+      }
+    };
+    fetchPilotInfo();
+  }, [user, profile]);
+
+  useEffect(() => {
+    if (!user || !profile || !profile.pilot) return;
+    const fetchClientes = async () => {
+      const q = query(collection(db, "contacts"), where("pilotId", "==", user.uid));
+      const snap = await getDocs(q);
+      const clientesArr: { name: string; email: string }[] = [];
+      for (const docSnap of snap.docs) {
+        const data = docSnap.data();
+        if (data.userId) {
+          const userSnap = await getDoc(doc(db, "users", data.userId));
+          if (userSnap.exists()) {
+            const userData = userSnap.data();
+            const name = (userData.firstName || "") + (userData.lastName ? " " + userData.lastName : "");
+            clientesArr.push({ name: name.trim() || userData.email, email: userData.email });
+          }
+        }
+      }
+      setClientes(clientesArr);
+    };
+    fetchClientes();
+  }, [user, profile]);
+
   if (loading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center">
@@ -116,6 +191,9 @@ const MyFlights = () => {
 
   // Versão para pilotos
   if (profile && profile.pilot) {
+    const treesPlanted = realizedFlightsCount;
+    const co2Compensated = realizedFlightsCount * 50;
+    const efetividade = pilotContactsCount && pilotContactsCount > 0 ? Math.round((realizedFlightsCount / pilotContactsCount) * 100) : 0;
     return (
       <div className="min-h-screen bg-gradient-hero">
         <Header />
@@ -147,19 +225,32 @@ const MyFlights = () => {
               </div>
               <Card className="bg-white border-0 shadow-lg flex flex-col h-full">
                 <CardHeader>
-                  <div className="mb-2">
-                    <span className="font-heading font-semibold text-gray-700 text-base block mb-1">Meus Vôos</span>
+                  <div className="grid grid-cols-2 grid-rows-2 gap-6 mb-2 text-center place-items-center">
+                    <div className="flex flex-col items-center justify-center">
+                      <span className="font-heading font-semibold text-gray-700 text-base mb-1 flex items-center gap-1 justify-center"><span>✈️</span>Voos</span>
+                      <span className="font-heading font-extrabold text-4xl text-green-700 leading-tight">{realizedFlightsCount}</span>
+                    </div>
+                    <div className="flex flex-col items-center justify-center">
+                      <span className="font-heading font-semibold text-gray-700 text-base mb-1 flex items-center gap-1 justify-center"><span>👥</span>Contatos</span>
+                      <span className="font-heading font-extrabold text-4xl text-green-700 leading-tight">{pilotContactsCount ?? 0}</span>
+                    </div>
+                    <div className="flex flex-col items-center justify-center">
+                      <span className="font-heading font-semibold text-gray-700 text-base mb-1 flex items-center gap-1 justify-center"><span>📈</span>Efetividade</span>
+                      <span className="font-extrabold text-3xl text-green-700 leading-tight">{efetividade}%</span>
+                    </div>
+                    <div className="flex flex-col items-center justify-center">
+                      <span className="font-heading font-semibold text-gray-700 text-base mb-1 flex items-center gap-1 justify-center"><span>⭐</span>Rating</span>
+                      <span className="font-bold text-green-700 text-3xl">{pilotRating ?? 0} <span className="text-gray-500 text-lg">/ 5.0</span></span>
+                    </div>
                   </div>
                   <CardTitle className="font-heading text-xl text-gray-900 flex items-center mt-2">
-                    <span className="mr-2">✈️</span>
-                    Voos realizados como piloto
+                    {/* Ícone removido */}
                   </CardTitle>
+
                 </CardHeader>
                 <CardContent className="space-y-6 flex-1 flex flex-col justify-between">
                   {/* Aqui você pode exibir uma lista de voos realizados, contatos, etc. */}
-                  <div className="space-y-3">
-                    <div className="text-gray-600">Em breve: painel de voos realizados, avaliações e mais!</div>
-                  </div>
+                  {/* Texto 'Em breve' removido */}
                 </CardContent>
               </Card>
             </div>
@@ -175,13 +266,57 @@ const MyFlights = () => {
                 <div className="flex flex-col gap-6 items-center text-center">
                   <div className="bg-greensky-50 rounded-lg p-6 w-full max-w-xs">
                     <div className="text-2xl mb-2">🌳</div>
-                    <div className="font-bold text-xl text-greensky-700">3</div>
+                    <div className="font-bold text-xl text-greensky-700">{treesPlanted}</div>
                     <div className="text-sm text-gray-600">Árvores Plantadas</div>
                   </div>
-                  {/* Adicione mais métricas se quiser */}
+                  <div className="bg-skyblue-50 rounded-lg p-6 w-full max-w-xs">
+                    <div className="text-2xl mb-2">💚</div>
+                    <div className="font-bold text-xl text-skyblue-700">0</div>
+                    <div className="text-sm text-gray-600">Sonho Realizado</div>
+                  </div>
+                  <div className="bg-sunset-50 rounded-lg p-6 w-full max-w-xs">
+                    <div className="text-2xl mb-2">⚡</div>
+                    <div className="font-bold text-xl text-sunset-700">{co2Compensated}kg</div>
+                    <div className="text-sm text-gray-600">CO₂ Compensado</div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
+            <div className="flex flex-col h-full bg-white border-0 shadow-lg rounded-lg p-6">
+              <h3 className="font-heading font-bold text-xl text-gray-900 mb-4 text-left">Meus clientes</h3>
+              {clientes.length === 0 ? (
+                <div className="text-gray-500 text-center">Nenhum cliente ainda.</div>
+              ) : (
+                <>
+                  <ul className="divide-y divide-gray-200 text-left">
+                    {clientes.map((c, i) => (
+                      <li key={i} className="py-2 flex flex-col gap-1">
+                        <div className="font-semibold text-gray-900">{c.name}</div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-gray-600 text-sm">{c.email}</span>
+                          <button
+                            className="text-green-700 hover:text-green-900 text-xs border border-green-200 rounded px-2 py-0.5 transition-colors"
+                            title="Copiar email"
+                            onClick={() => copyToClipboard(c.email, i)}
+                          >
+                            Copiar
+                          </button>
+                          {copiedIndex === i && (
+                            <span className="text-green-600 text-xs ml-1">Copiado!</span>
+                          )}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                  <button
+                    className="mt-6 w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded transition-colors"
+                    onClick={() => exportClientesCSV(clientes)}
+                  >
+                    Exportar como csv
+                  </button>
+                </>
+              )}
+            </div>
           </div>
           {/* Card de confirmação de voo para pilotos */}
           <Card className="mb-8 bg-white border-0 shadow-xl">
@@ -210,7 +345,7 @@ const MyFlights = () => {
                         <div className="text-gray-500 text-xs mt-1">Contato em: {c.timestamp && c.timestamp.toDate ? c.timestamp.toDate().toLocaleString() : "-"}</div>
                       </div>
                       <div className="w-full flex justify-center mt-2">
-                        {c.confirmed ? (
+                        {c.realized ? (
                           <span className="text-green-600 font-semibold">Vôo confirmado!</span>
                         ) : (
                           <AlertDialog open={confirmPilotId === c.id} onOpenChange={open => setConfirmPilotId(open ? c.id : null)}>
@@ -229,8 +364,8 @@ const MyFlights = () => {
                               <AlertDialogFooter>
                                 <AlertDialogCancel>Cancelar</AlertDialogCancel>
                                 <AlertDialogAction onClick={async () => {
-                                  await updateDoc(doc(db, "contacts", c.id), { confirmed: true });
-                                  setPilotContacts(prev => prev.map(x => x.id === c.id ? { ...x, confirmed: true } : x));
+                                  await updateDoc(doc(db, "contacts", c.id), { realized: true });
+                                  setPilotContacts(prev => prev.map(x => x.id === c.id ? { ...x, realized: true } : x));
                                   setConfirmPilotId(null);
                                 }}>Confirmar</AlertDialogAction>
                               </AlertDialogFooter>
@@ -251,11 +386,48 @@ const MyFlights = () => {
   }
 
   const miles = contacts.filter(c => c.realized).length * 250;
+  const treesPlanted = Math.floor(miles / 250);
+  const co2Compensated = treesPlanted * 150;
 
   // Função para feedback dos botões de milhas
   const handleMilesAction = (action: string) => {
     window.alert(`${action} em desenvolvimento!`);
   };
+
+  // Função para exportar clientes como CSV
+  function exportClientesCSV(clientes: { name: string; email: string }[]) {
+    if (!clientes.length) return;
+    const header = 'Nome,Email\n';
+    const rows = clientes.map(c => `"${c.name}","${c.email}"`).join('\n');
+    const csvContent = header + rows;
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'clientes.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  // Função para copiar texto para a área de transferência
+  function copyToClipboard(text: string, idx?: number) {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text);
+    } else {
+      // Fallback para navegadores antigos
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+    }
+    if (typeof idx === 'number') {
+      setCopiedIndex(idx);
+      setTimeout(() => setCopiedIndex(null), 1200);
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gradient-hero">
@@ -360,17 +532,17 @@ const MyFlights = () => {
               <div className="flex flex-col gap-6 items-center text-center">
                 <div className="bg-greensky-50 rounded-lg p-6 w-full max-w-xs">
                   <div className="text-2xl mb-2">🌳</div>
-                  <div className="font-bold text-xl text-greensky-700">3</div>
+                  <div className="font-bold text-xl text-greensky-700">{treesPlanted}</div>
                   <div className="text-sm text-gray-600">Árvores Plantadas</div>
                 </div>
                 <div className="bg-skyblue-50 rounded-lg p-6 w-full max-w-xs">
                   <div className="text-2xl mb-2">💚</div>
-                  <div className="font-bold text-xl text-skyblue-700">1</div>
+                  <div className="font-bold text-xl text-skyblue-700">0</div>
                   <div className="text-sm text-gray-600">Sonho Realizado</div>
                 </div>
                 <div className="bg-sunset-50 rounded-lg p-6 w-full max-w-xs">
                   <div className="text-2xl mb-2">⚡</div>
-                  <div className="font-bold text-xl text-sunset-700">150kg</div>
+                  <div className="font-bold text-xl text-sunset-700">{co2Compensated}kg</div>
                   <div className="text-sm text-gray-600">CO₂ Compensado</div>
                 </div>
               </div>
@@ -482,6 +654,7 @@ const MyFlights = () => {
                                 await updateDoc(doc(db, "contacts", c.id), { realized: true });
                                 setContacts(prev => prev.map(x => x.id === c.id ? { ...x, realized: true } : x));
                                 setConfirmId(null);
+                                setShowRating(c.id); // Abre modal de avaliação
                               }}>Confirmar</AlertDialogAction>
                             </AlertDialogFooter>
                           </AlertDialogContent>
@@ -496,6 +669,56 @@ const MyFlights = () => {
         </Card>
       </main>
       <Footer />
+      {/* Modal de avaliação após confirmação */}
+      {showRating && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-lg shadow-lg p-8 w-full max-w-md flex flex-col items-center">
+            <h2 className="text-xl font-bold mb-4">Avalie seu voo</h2>
+            <div className="flex gap-2 mb-4">
+              {[1,2,3,4,5].map(star => (
+                <button key={star} onClick={() => setRatingValue(star)}>
+                  <Star className={`w-8 h-8 ${star <= ratingValue ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'}`} fill={star <= ratingValue ? '#facc15' : 'none'} />
+                </button>
+              ))}
+            </div>
+            <textarea
+              className="w-full border rounded p-2 mb-4"
+              rows={3}
+              placeholder="Deixe um comentário (opcional)"
+              value={ratingText}
+              onChange={e => setRatingText(e.target.value)}
+            />
+            <div className="flex gap-2 w-full">
+              <Button className="flex-1" variant="outline" onClick={() => setShowRating(null)}>Cancelar</Button>
+              <Button className="flex-1 bg-green-600 hover:bg-green-700 text-white" onClick={async () => {
+                await updateDoc(doc(db, "contacts", showRating), { rating: ratingValue, review: ratingText });
+                // Atualizar piloto: realized +1 e rating média ponderada
+                // Buscar pilotId do contato
+                const contact = contacts.find(c => c.id === showRating);
+                if (contact && contact.pilotId) {
+                  // Buscar piloto pelo campo pilotId
+                  const qPilot = query(collection(db, "pilots"), where("pilotId", "==", contact.pilotId));
+                  const snapPilot = await getDocs(qPilot);
+                  if (!snapPilot.empty) {
+                    const pilotDoc = snapPilot.docs[0];
+                    const pilotRef = doc(db, "pilots", pilotDoc.id);
+                    const pilotData = pilotDoc.data();
+                    const realized = typeof pilotData.realized === 'number' ? pilotData.realized + 1 : 1;
+                    const oldRating = typeof pilotData.rating === 'number' ? pilotData.rating : 0;
+                    const oldCount = typeof pilotData.ratingCount === 'number' ? pilotData.ratingCount : 0;
+                    const newCount = oldCount + 1;
+                    const newRating = ((oldRating * oldCount) + ratingValue) / newCount;
+                    await updateDoc(pilotRef, { realized, rating: newRating, ratingCount: newCount });
+                  }
+                }
+                setShowRating(null);
+                setRatingValue(0);
+                setRatingText("");
+              }}>Enviar Avaliação</Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

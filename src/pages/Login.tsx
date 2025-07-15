@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -21,8 +23,15 @@ const Login = () => {
     setLoading(true);
     setError("");
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-      navigate("/perfil");
+      const cred = await signInWithEmailAndPassword(auth, email, password);
+      // Buscar perfil do usuário
+      const docRef = doc(db, "users", cred.user.uid);
+      const snap = await getDoc(docRef);
+      if (snap.exists() && snap.data().pilot === true) {
+        navigate("/meus-voos");
+      } else {
+        navigate("/minhas-milhas");
+      }
     } catch (err: any) {
       setError(err.message || "Erro ao fazer login");
     } finally {

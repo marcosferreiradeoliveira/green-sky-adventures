@@ -4,14 +4,15 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 
 interface HeroSectionProps {
-  searchLocation: string;
-  setSearchLocation: (value: string) => void;
-  onSearch: () => void;
+  searchLocation?: string;
+  setSearchLocation?: (value: string) => void;
+  onSearch?: () => void;
+  hideSearchBar?: boolean;
 }
 
-const HeroSection = ({ searchLocation, setSearchLocation, onSearch }: HeroSectionProps) => {
+const HeroSection = ({ searchLocation = '', setSearchLocation, onSearch, hideSearchBar = false }: HeroSectionProps) => {
   return (
-    <section className="relative min-h-[90vh] flex items-center justify-center overflow-hidden">
+    <section className="relative min-h-[45vh] flex items-center justify-center overflow-hidden">
       {/* Background Image */}
       <div 
         className="absolute inset-0 bg-cover bg-center bg-no-repeat"
@@ -40,42 +41,31 @@ const HeroSection = ({ searchLocation, setSearchLocation, onSearch }: HeroSectio
           </p>
 
           {/* Search Bar */}
-          <Card className="max-w-2xl mx-auto bg-white/95 backdrop-blur-md border-0 shadow-2xl mb-8">
-            <div className="p-6">
-              <div className="flex flex-col sm:flex-row gap-4">
-                <Input
-                  placeholder="Para onde você quer voar? (Cidade/Estado)"
-                  value={searchLocation}
-                  onChange={(e) => setSearchLocation(e.target.value)}
-                  className="flex-1 h-12 text-lg border-0 bg-transparent placeholder:text-gray-500"
-                  onKeyPress={(e) => e.key === 'Enter' && onSearch()}
-                />
-                <Button 
-                  onClick={onSearch}
-                  size="lg"
-                  className="h-12 px-8 bg-gradient-sunset hover:opacity-90 transition-opacity font-semibold"
-                >
-                  Buscar Voos
-                </Button>
+          {!hideSearchBar && (
+            <Card className="max-w-2xl mx-auto bg-white/95 backdrop-blur-md border-0 shadow-2xl mb-8">
+              <div className="p-6">
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <Input
+                    placeholder="Para onde você quer voar? (Cidade/Estado)"
+                    value={searchLocation}
+                    onChange={(e) => setSearchLocation && setSearchLocation(e.target.value)}
+                    className="flex-1 h-12 text-lg border-0 bg-transparent placeholder:text-gray-500"
+                    onKeyPress={(e) => onSearch && e.key === 'Enter' && onSearch()}
+                  />
+                  <Button 
+                    onClick={onSearch}
+                    size="lg"
+                    className="h-12 px-8 bg-gradient-sunset hover:opacity-90 transition-opacity font-semibold"
+                  >
+                    Buscar Voos
+                  </Button>
+                </div>
               </div>
-            </div>
-          </Card>
+            </Card>
+          )}
 
           {/* Trust Indicators */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 max-w-3xl mx-auto">
-            <div className="text-center">
-              <div className="text-3xl mb-2">🏆</div>
-              <div className="text-sm font-medium">Pilotos Certificados</div>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl mb-2">🌍</div>
-              <div className="text-sm font-medium">Impacto Sustentável</div>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl mb-2">✨</div>
-              <div className="text-sm font-medium">+1000 Voos Realizados</div>
-            </div>
-          </div>
+          {/* Removido conforme solicitado */}
         </div>
       </div>
 

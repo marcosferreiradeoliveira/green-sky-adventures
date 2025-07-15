@@ -40,6 +40,7 @@ const PilotCard = ({ pilot }: PilotCardProps) => {
           pilotId: pilot.pilotId || pilot.id,
           timestamp: serverTimestamp(),
           realized: false,
+          confirmed: false,
         };
         // Cria o contato e pega o id
         const contactRef = await addDoc(collection(db, "contacts"), contactData);
