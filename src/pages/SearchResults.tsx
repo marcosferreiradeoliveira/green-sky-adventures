@@ -11,6 +11,7 @@ import { db } from "@/lib/firebase";
 
 interface Pilot {
   id: string;
+  uid: string;
   name: string;
   school: string;
   photo: string;
@@ -41,6 +42,7 @@ const SearchResults = () => {
           return {
             id: doc.id,
             pilotId: data.pilotId || '',
+            uid: data.uid || '', // Campo UID necessário para contatos
             name: data.name || '',
             school: data.school || '',
             photo: data.photo || '',
@@ -67,6 +69,7 @@ const SearchResults = () => {
           return {
             id: doc.id,
             pilotId: data.pilotId || '',
+            uid: data.uid || '', // Campo UID necessário para contatos
             name: data.name || '',
             school: data.school || '',
             photo: data.photo || '',

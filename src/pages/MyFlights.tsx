@@ -60,8 +60,8 @@ const MyFlights = () => {
           let pilot = null;
           if (data.pilotId) {
             console.log('[DEBUG] Buscando piloto para pilotId:', data.pilotId);
-            // Buscar pelo campo pilotId, não pelo id do documento
-            const qPilot = query(collection(db, "pilots"), where("pilotId", "==", data.pilotId));
+            // Buscar pelo campo uid, já que pilotId nos contatos contém o UID do piloto
+            const qPilot = query(collection(db, "pilots"), where("uid", "==", data.pilotId));
             const snapPilot = await getDocs(qPilot);
             if (!snapPilot.empty) {
               const pilotDoc = snapPilot.docs[0];

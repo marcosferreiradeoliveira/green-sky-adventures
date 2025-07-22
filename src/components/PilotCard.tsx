@@ -11,6 +11,7 @@ interface PilotCardProps {
   pilot: {
     id: string;
     pilotId?: string;
+    uid: string;
     name: string;
     school: string;
     photo: string;
@@ -35,9 +36,16 @@ const PilotCard = ({ pilot }: PilotCardProps) => {
   const handleContact = async () => {
     if (pilot.whatsapp) {
       try {
+        // Verificar se pilot.uid existe antes de criar o contato
+        if (!pilot.uid) {
+          console.error('Pilot UID is missing:', pilot);
+          toast({ title: "Erro", description: "UID do piloto não encontrado. Tente novamente.", duration: 5000 });
+          return;
+        }
+        
         const contactData = {
           userId: currentUser ? currentUser.uid : null,
-          pilotId: pilot.pilotId || pilot.id,
+          pilotId: pilot.uid, // UID do piloto da collection pilots
           timestamp: serverTimestamp(),
           realized: false,
           confirmed: false,

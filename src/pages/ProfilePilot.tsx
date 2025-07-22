@@ -10,6 +10,7 @@ import Footer from "@/components/Footer";
 import { auth } from "@/lib/firebase";
 import { addDoc, collection, updateDoc, arrayUnion, serverTimestamp } from "firebase/firestore";
 import { onAuthStateChanged, User } from "firebase/auth";
+import { useToast } from "@/hooks/use-toast";
 
 const ProfilePilot = () => {
   const { id } = useParams();
@@ -17,13 +18,19 @@ const ProfilePilot = () => {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (!id) return;
     const fetchPilot = async () => {
       const docRef = doc(db, "pilots", id);
       const snap = await getDoc(docRef);
-      if (snap.exists()) setPilot({ id: snap.id, ...snap.data() });
+      if (snap.exists()) {
+        const pilotData = { id: snap.id, ...snap.data() };
+        console.log('Pilot data fetched:', pilotData);
+        console.log('Pilot UID field:', pilotData.uid);
+        setPilot(pilotData);
+      }
       setLoading(false);
     };
     fetchPilot();
@@ -37,9 +44,16 @@ const ProfilePilot = () => {
   const handleContact = async () => {
     if (pilot.whatsapp) {
       try {
+        // Verificar se pilot.uid existe antes de criar o contato
+        if (!pilot.uid) {
+          console.error('Pilot UID is missing:', pilot);
+          toast({ title: "Erro", description: "UID do piloto não encontrado. Tente novamente.", duration: 5000 });
+          return;
+        }
+        
         const contactData = {
           userId: currentUser ? currentUser.uid : null,
-          pilotId: id, // sempre o id do doc
+          pilotId: pilot.uid, // UID do piloto da collection pilots
           timestamp: serverTimestamp(),
           realized: false,
           confirmed: false,
