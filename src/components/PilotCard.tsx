@@ -87,7 +87,7 @@ const PilotCard = ({ pilot }: PilotCardProps) => {
           />
           <div className="absolute top-3 right-3">
             <Badge className="bg-white/90 text-gray-800 hover:bg-white">
-              ⭐ {pilot.rating}
+              ⭐ {pilot.rating.toFixed(1)}
             </Badge>
           </div>
           <div className="absolute top-3 left-3">

@@ -42,6 +42,7 @@ const MyFlights = () => {
   const [showRating, setShowRating] = useState<string | null>(null); // contactId
   const [ratingValue, setRatingValue] = useState(0);
   const [ratingText, setRatingText] = useState("");
+  const [showRewards, setShowRewards] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
@@ -87,19 +88,37 @@ const MyFlights = () => {
     if (!user || !profile || !profile.pilot) return;
     const fetchPilotContacts = async () => {
       setLoadingPilotContacts(true);
+      console.log('[DEBUG PILOT] Buscando contatos para piloto UID:', user.uid);
       const q = query(collection(db, "contacts"), where("pilotId", "==", user.uid));
       const snapContacts = await getDocs(q);
+      console.log('[DEBUG PILOT] Contatos encontrados:', snapContacts.docs.length);
       const contactsArr = [];
       for (const c of snapContacts.docs) {
         const data = c.data();
+        console.log('[DEBUG PILOT] Contato:', { id: c.id, pilotId: data.pilotId, userId: data.userId, realized: data.realized });
         // Busca dados do usuário que fez o contato
         let contactUser = null;
         if (data.userId) {
-          const userSnap = await getDoc(doc(db, "users", data.userId));
-          if (userSnap.exists()) contactUser = userSnap.data();
+          try {
+            const userSnap = await getDoc(doc(db, "users", data.userId));
+            if (userSnap.exists()) {
+              contactUser = userSnap.data();
+            } else {
+              console.log('[DEBUG PILOT] Usuário não encontrado:', data.userId);
+            }
+          } catch (error) {
+            console.log('[DEBUG PILOT] Erro de permissão ao buscar usuário:', data.userId, error);
+            // Criar um objeto básico com informações limitadas
+            contactUser = {
+              firstName: 'Usuário',
+              lastName: '',
+              email: data.userId // Usar o ID como fallback
+            };
+          }
         }
         contactsArr.push({ ...data, id: c.id, contactUser });
       }
+      console.log('[DEBUG PILOT] Array final de contatos:', contactsArr);
       setPilotContacts(contactsArr);
       setLoadingPilotContacts(false);
     };
@@ -142,20 +161,38 @@ const MyFlights = () => {
   useEffect(() => {
     if (!user || !profile || !profile.pilot) return;
     const fetchClientes = async () => {
+      console.log('[DEBUG CLIENTES] Buscando clientes para piloto UID:', user.uid);
       const q = query(collection(db, "contacts"), where("pilotId", "==", user.uid));
       const snap = await getDocs(q);
+      console.log('[DEBUG CLIENTES] Contatos encontrados para clientes:', snap.docs.length);
       const clientesArr: { name: string; email: string }[] = [];
       for (const docSnap of snap.docs) {
         const data = docSnap.data();
+        console.log('[DEBUG CLIENTES] Processando contato:', { id: docSnap.id, userId: data.userId, pilotId: data.pilotId });
         if (data.userId) {
-          const userSnap = await getDoc(doc(db, "users", data.userId));
-          if (userSnap.exists()) {
-            const userData = userSnap.data();
-            const name = (userData.firstName || "") + (userData.lastName ? " " + userData.lastName : "");
-            clientesArr.push({ name: name.trim() || userData.email, email: userData.email });
+          try {
+            const userSnap = await getDoc(doc(db, "users", data.userId));
+            if (userSnap.exists()) {
+              const userData = userSnap.data();
+              const name = (userData.firstName || "") + (userData.lastName ? " " + userData.lastName : "");
+              console.log('[DEBUG CLIENTES] Dados do usuário:', { name: name.trim() || userData.email, email: userData.email });
+              clientesArr.push({ name: name.trim() || userData.email, email: userData.email });
+            } else {
+              console.log('[DEBUG CLIENTES] Usuário não encontrado para userId:', data.userId);
+            }
+          } catch (error) {
+            console.log('[DEBUG CLIENTES] Erro de permissão ao buscar usuário:', data.userId, error);
+            // Adicionar cliente com informações limitadas
+            clientesArr.push({ 
+              name: `Cliente ${data.userId.substring(0, 8)}...`, 
+              email: 'Email não disponível' 
+            });
           }
+        } else {
+          console.log('[DEBUG CLIENTES] Contato sem userId:', docSnap.id);
         }
       }
+      console.log('[DEBUG CLIENTES] Array final de clientes:', clientesArr);
       setClientes(clientesArr);
     };
     fetchClientes();
@@ -240,7 +277,7 @@ const MyFlights = () => {
                     </div>
                     <div className="flex flex-col items-center justify-center">
                       <span className="font-heading font-semibold text-gray-700 text-base mb-1 flex items-center gap-1 justify-center"><span>⭐</span>Rating</span>
-                      <span className="font-bold text-green-700 text-3xl">{pilotRating ?? 0} <span className="text-gray-500 text-lg">/ 5.0</span></span>
+                      <span className="font-bold text-green-700 text-3xl">{(pilotRating ?? 0).toFixed(1)} <span className="text-gray-500 text-lg">/ 5.0</span></span>
                     </div>
                   </div>
                   <CardTitle className="font-heading text-xl text-gray-900 flex items-center mt-2">
@@ -714,8 +751,56 @@ const MyFlights = () => {
                 setShowRating(null);
                 setRatingValue(0);
                 setRatingText("");
+                setShowRewards(true);
               }}>Enviar Avaliação</Button>
             </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Popup de Recompensas */}
+      {showRewards && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-lg mx-4 flex flex-col items-center">
+            <div className="text-6xl mb-4">🎉</div>
+            <h2 className="text-2xl font-bold text-green-600 mb-2 text-center">Parabéns!</h2>
+            <p className="text-gray-600 mb-6 text-center">Você ganhou recompensas incríveis por sua aventura sustentável!</p>
+            
+            <div className="w-full space-y-4 mb-6">
+              {/* Milhas */}
+              <div className="bg-blue-50 rounded-xl p-4 flex items-center gap-4">
+                <div className="text-3xl">✈️</div>
+                <div className="flex-1">
+                  <div className="font-bold text-blue-600 text-lg">250 Milhas</div>
+                  <div className="text-blue-500 text-sm">Adicionadas à sua conta</div>
+                </div>
+              </div>
+              
+              {/* Árvore */}
+              <div className="bg-green-50 rounded-xl p-4 flex items-center gap-4">
+                <div className="text-3xl">🌳</div>
+                <div className="flex-1">
+                  <div className="font-bold text-green-600 text-lg">1 Árvore Plantada</div>
+                  <div className="text-green-500 text-sm">Contribuindo para o reflorestamento</div>
+                </div>
+              </div>
+              
+              {/* CO2 */}
+              <div className="bg-emerald-50 rounded-xl p-4 flex items-center gap-4">
+                <div className="text-3xl">🌱</div>
+                <div className="flex-1">
+                  <div className="font-bold text-emerald-600 text-lg">300kg CO2 Compensado</div>
+                  <div className="text-emerald-500 text-sm">Reduzindo sua pegada de carbono</div>
+                </div>
+              </div>
+            </div>
+            
+            <Button 
+              className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 text-lg"
+              onClick={() => setShowRewards(false)}
+            >
+              Continuar Aventurando! 🌱
+            </Button>
           </div>
         </div>
       )}

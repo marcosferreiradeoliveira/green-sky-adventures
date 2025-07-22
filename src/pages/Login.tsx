@@ -28,7 +28,7 @@ const Login = () => {
       const docRef = doc(db, "users", cred.user.uid);
       const snap = await getDoc(docRef);
       if (snap.exists() && snap.data().pilot === true) {
-        navigate("/meus-voos");
+        navigate("/minhas-milhas");
       } else {
         navigate("/minhas-milhas");
       }

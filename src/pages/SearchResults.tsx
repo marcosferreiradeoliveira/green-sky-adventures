@@ -4,8 +4,6 @@ import Header from "@/components/Header";
 import PilotCard from "@/components/PilotCard";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card } from "@/components/ui/card";
 import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
@@ -26,65 +24,41 @@ interface Pilot {
 const SearchResults = () => {
   const [searchParams] = useSearchParams();
   const location = searchParams.get('location') || '';
-  const [searchTerm, setSearchTerm] = useState(location);
   const [pilots, setPilots] = useState<Pilot[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     setLoading(true);
     let q = collection(db, "pilots");
-    // Filtro simples por localização ou nome
-    if (searchTerm) {
-      // Firestore não suporta contains em múltiplos campos, então filtramos no client
-      onSnapshot(q, (snapshot) => {
-        const all = snapshot.docs.map(doc => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            pilotId: data.pilotId || '',
-            uid: data.uid || '', // Campo UID necessário para contatos
-            name: data.name || '',
-            school: data.school || '',
-            photo: data.photo || '',
-            type: data.type || '',
-            location: data.location || '',
-            price: data.price || '',
-            rating: typeof data.rating === 'number' ? data.rating : 0,
-            experience: data.experience || '',
-            whatsapp: data.whatsapp || '',
-          };
-        });
-        setPilots(
-          all.filter(pilot =>
-            pilot.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            pilot.name.toLowerCase().includes(searchTerm.toLowerCase())
-          )
-        );
-        setLoading(false);
+    
+    onSnapshot(q, (snapshot) => {
+      const all = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          pilotId: data.pilotId || '',
+          uid: data.uid || '', // Campo UID necessário para contatos
+          name: data.name || '',
+          school: data.school || '',
+          photo: data.photo || '',
+          type: data.type || '',
+          location: data.location || '',
+          price: data.price || '',
+          rating: typeof data.rating === 'number' ? data.rating : 0,
+          experience: data.experience || '',
+          whatsapp: data.whatsapp || '',
+        };
       });
-    } else {
-      onSnapshot(q, (snapshot) => {
-        setPilots(snapshot.docs.map(doc => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            pilotId: data.pilotId || '',
-            uid: data.uid || '', // Campo UID necessário para contatos
-            name: data.name || '',
-            school: data.school || '',
-            photo: data.photo || '',
-            type: data.type || '',
-            location: data.location || '',
-            price: data.price || '',
-            rating: typeof data.rating === 'number' ? data.rating : 0,
-            experience: data.experience || '',
-            whatsapp: data.whatsapp || '',
-          };
-        }));
-        setLoading(false);
-      });
-    }
-  }, [searchTerm]);
+      
+      // Filtrar por localização se fornecida nos parâmetros da URL
+      const filteredPilots = location 
+        ? all.filter(pilot => pilot.location.toLowerCase().includes(location.toLowerCase()))
+        : all;
+        
+      setPilots(filteredPilots);
+      setLoading(false);
+    });
+  }, [location]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -102,22 +76,7 @@ const SearchResults = () => {
                 {pilots.length} pilotos encontrados • Todos certificados e verificados
               </p>
             </div>
-            
-            <Card className="lg:w-96 bg-white border shadow-sm">
-              <div className="p-4">
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="Refinar busca..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="flex-1"
-                  />
-                  <Button className="bg-gradient-primary">
-                    Buscar
-                  </Button>
-                </div>
-              </div>
-            </Card>
+
           </div>
         </div>
 

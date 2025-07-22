@@ -90,11 +90,12 @@ const ProfilePilot = () => {
         {/* Fotos demonstrativas em destaque no topo */}
         {pilot.demoPhotos && pilot.demoPhotos.length > 0 && (
           <div className="w-full mb-8 relative">
-            <Carousel className="w-full max-w-5xl mx-auto">
+            <Carousel className="w-full max-w-5xl mx-auto relative">
               <CarouselContent>
                 {pilot.demoPhotos.map((url: string, i: number) => (
                   <CarouselItem key={i} className="flex flex-col items-center justify-center relative">
                     <img src={url} alt="Foto demonstrativa" className="w-full max-h-[420px] object-cover rounded border mb-2" />
+                    
                     {/* Overlay com rating, type, city, state */}
                     {i === 0 && (
                       <div className="absolute left-8 bottom-4 bg-white/90 rounded-lg shadow px-6 py-3 flex flex-col gap-1">
@@ -108,42 +109,98 @@ const ProfilePilot = () => {
               </CarouselContent>
               <CarouselPrevious />
               <CarouselNext />
+              
+              {/* Botão fixo no canto inferior direito dentro do carousel */}
+              <div className="absolute bottom-4 right-4 z-10">
+                <Button 
+                  className="bg-white hover:bg-gray-50 text-green-600 border-2 border-green-600 font-bold px-12 py-6 text-2xl rounded-2xl shadow-2xl transform hover:scale-105 transition-all duration-300 flex items-center gap-4"
+                  onClick={handleContact}
+                >
+                  <span className="text-3xl">🌱</span>
+                  Aventure-se com propósito!
+                </Button>
+              </div>
             </Carousel>
           </div>
         )}
         {/* Dados principais do piloto */}
         <div className="w-full max-w-5xl mx-auto bg-white rounded-lg shadow-lg p-6 flex flex-col gap-4 mt-[-32px]">
-          <div className="flex flex-col md:flex-row items-center gap-6">
-            <div className="flex-shrink-0">
-              {pilot.photo ? (
-                <img src={pilot.photo} alt={pilot.name} className="w-32 h-32 rounded-full object-cover border-4 border-white shadow-lg" />
-              ) : (
-                <div className="w-32 h-32 rounded-full border-4 border-white shadow-lg bg-gray-100 flex items-center justify-center">
-                  <span className="text-gray-400 text-5xl">📷</span>
-                </div>
-              )}
-            </div>
-            <div className="flex flex-col gap-2 items-center md:items-start w-full">
-              <span className="font-bold text-2xl text-gray-900">{pilot.name}</span>
-              <span className="text-green-700 font-bold text-lg">R$ {pilot.price}</span>
-              {pilot.meetingPoint && (
-                <span className="text-gray-700 text-sm"><span className="font-semibold">Ponto de Encontro:</span> {pilot.meetingPoint}</span>
-              )}
-              <span className="text-gray-600 text-sm"><span className="font-semibold">Experiência:</span> {pilot.experience}</span>
-              <Button className="mt-2 bg-green-600 hover:bg-green-700 text-white font-semibold w-full md:w-fit" onClick={handleContact}>
-                Entrar em Contato
-              </Button>
-            </div>
-          </div>
           {/* Descrição */}
           <div>
             <h2 className="font-bold text-lg mb-2">Descrição</h2>
             <p className="text-gray-800 whitespace-pre-line">{pilot.description || 'Sem descrição.'}</p>
           </div>
-          {/* Botão Entrar em Contato no final */}
-          <Button className="mt-6 bg-green-600 hover:bg-green-700 text-white font-semibold w-full md:w-fit h-16 text-xl" onClick={handleContact}>
-            Entrar em Contato
-          </Button>
+          {/* Card único com dados do piloto e impacto ambiental */}
+          <Card className="mt-6">
+            <CardContent className="p-6">
+              <div className="flex flex-col md:flex-row gap-6">
+                {/* Foto do piloto alinhada à esquerda */}
+                <div className="flex-shrink-0">
+                  {pilot.photo ? (
+                    <img src={pilot.photo} alt={pilot.name} className="w-32 h-32 rounded-full object-cover border-4 border-white shadow-lg" />
+                  ) : (
+                    <div className="w-32 h-32 rounded-full border-4 border-white shadow-lg bg-gray-100 flex items-center justify-center">
+                      <span className="text-gray-400 text-5xl">📷</span>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Dados do piloto com espaçamento reduzido */}
+                <div className="flex flex-col gap-1 justify-center flex-1">
+                  <span className="font-bold text-2xl text-gray-900">{pilot.name}</span>
+                  <span className="text-green-700 font-bold text-lg">R$ {pilot.price}</span>
+                  {pilot.meetingPoint && (
+                    <span className="text-gray-700 text-sm"><span className="font-semibold">Ponto de Encontro:</span> {pilot.meetingPoint}</span>
+                  )}
+                  <span className="text-gray-600 text-sm"><span className="font-semibold">Experiência:</span> {pilot.experience}</span>
+                </div>
+              </div>
+              
+              {/* Seção de impacto ambiental */}
+              <div className="mt-6">
+                <h3 className="font-bold text-lg text-gray-900 mb-3">Impacto Ambiental por Voo</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {/* Milhas geradas */}
+                  <div className="flex items-center gap-2 p-3 bg-blue-50 rounded-lg">
+                    <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center">
+                      <span className="text-white text-sm">✈️</span>
+                    </div>
+                    <div className="flex-1">
+                      <div className="font-semibold text-gray-900 text-sm">Milhas</div>
+                      <div className="text-blue-600 font-bold">150</div>
+                    </div>
+                  </div>
+
+                  {/* Árvores plantadas */}
+                  <div className="flex items-center gap-2 p-3 bg-green-50 rounded-lg">
+                    <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center">
+                      <span className="text-white text-sm">🌳</span>
+                    </div>
+                    <div className="flex-1">
+                      <div className="font-semibold text-gray-900 text-sm">Árvores</div>
+                      <div className="text-green-600 font-bold">2</div>
+                    </div>
+                  </div>
+
+                  {/* CO2 retirado */}
+                  <div className="flex items-center gap-2 p-3 bg-emerald-50 rounded-lg">
+                    <div className="w-10 h-10 bg-emerald-500 rounded-full flex items-center justify-center">
+                      <span className="text-white text-sm">🌍</span>
+                    </div>
+                    <div className="flex-1">
+                      <div className="font-semibold text-gray-900 text-sm">CO₂ (kg)</div>
+                      <div className="text-emerald-600 font-bold">25</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Botão ocupando toda a largura do card, abaixo de tudo */}
+              <Button className="mt-6 bg-green-600 hover:bg-green-700 text-white font-semibold w-full h-16 text-xl" onClick={handleContact}>
+                Aventure-se com propósito
+              </Button>
+            </CardContent>
+          </Card>
           {/* Vídeos demonstrativos */}
           {pilot.demoVideos && pilot.demoVideos.length > 0 && (
             <div className="mt-6">

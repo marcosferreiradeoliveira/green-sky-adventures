@@ -67,7 +67,10 @@ const Header = () => {
             >
               {profile && profile.pilot ? "Meus Vôos" : "Minhas Milhas"}
             </a>
-            <a href="#impacto" className="text-gray-600 hover:text-greensky-600 transition-colors">
+            <a
+              className="text-gray-600 hover:text-greensky-600 transition-colors cursor-pointer"
+              onClick={e => { e.preventDefault(); navigate("/nosso-impacto"); }}
+            >
               Nosso Impacto
             </a>
           </nav>
