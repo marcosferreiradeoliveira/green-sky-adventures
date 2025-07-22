@@ -1,9 +1,10 @@
 // Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
-import { getAnalytics } from "firebase/analytics";
+import { getAnalytics, logEvent, setUserProperties, setUserId, isSupported } from "firebase/analytics";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
+import { Analytics, EventParams } from "firebase/analytics";
 
 // Check if Firebase environment variables are available
 const hasFirebaseConfig = import.meta.env.VITE_FIREBASE_PROJECT_ID && 
@@ -35,15 +36,52 @@ const firebaseConfig = hasFirebaseConfig ? {
 const app = initializeApp(firebaseConfig);
 
 // Initialize services conditionally
-let analytics: any = null;
+let analytics: Analytics | null = null;
 let auth: any = null;
 let db: any = null;
 let storage: any = null;
 
-try {
+// Initialize analytics if supported and in production
+const initAnalytics = async () => {
   if (hasFirebaseConfig) {
-    analytics = getAnalytics(app);
+    try {
+      const isAnalyticsSupported = await isSupported();
+      if (isAnalyticsSupported) {
+        analytics = getAnalytics(app);
+        // Set user properties if needed
+        if (auth.currentUser) {
+          setUserId(analytics, auth.currentUser.uid);
+          setUserProperties(analytics, {
+            user_type: 'visitor', // Will be updated after login
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Analytics initialization error:', error);
+    }
   }
+};
+
+// Track page views
+export const logPageView = (pageTitle: string, pagePath: string) => {
+  if (!analytics) return;
+  
+  logEvent(analytics, 'page_view', {
+    page_title: pageTitle,
+    page_path: pagePath,
+    page_location: window.location.href,
+  });};
+
+// Track custom events
+export const trackEvent = (eventName: string, params?: EventParams) => {
+  if (!analytics) return;
+  
+  logEvent(analytics, eventName, params);
+};
+
+// Initialize all services
+try {
+  initAnalytics();
   auth = getAuth(app);
   db = getFirestore(app);
   storage = getStorage(app);
