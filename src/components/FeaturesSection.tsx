@@ -62,6 +62,7 @@ const FeaturesSection = () => {
             size="lg" 
             variant="outline"
             className="border-2 border-greensky-600 text-greensky-600 hover:bg-greensky-600 hover:text-white transition-colors px-8 py-3"
+            onClick={() => window.location.href = '/nosso-impacto'}
           >
             Saiba Mais Sobre Nosso Impacto
           </Button>

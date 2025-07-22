@@ -16,6 +16,7 @@ import EditProfile from "./pages/EditProfile";
 import MyFlights from "./pages/MyFlights";
 import EditarOferta from "./pages/EditarOferta";
 import ProfilePilot from "./pages/ProfilePilot";
+import NossoImpacto from "./pages/NossoImpacto";
 
 const queryClient = new QueryClient();
 
@@ -38,6 +39,7 @@ const App = () => (
           <Route path="/minhas-milhas" element={<MyFlights />} />
           <Route path="/editar-oferta" element={<EditarOferta />} />
           <Route path="/piloto/:id" element={<ProfilePilot />} />
+          <Route path="/nosso-impacto" element={<NossoImpacto />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
