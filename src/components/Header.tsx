@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged, signOut, User } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
+import logo from "@/assets/logo.png";
 import {
   AlertDialog,
   AlertDialogTrigger,
@@ -51,10 +52,12 @@ const Header = () => {
       <div className="container mx-auto px-4 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2 cursor-pointer" onClick={() => navigate("/")}>
-            <div className="w-8 h-8 bg-gradient-primary rounded-full flex items-center justify-center">
-              <span className="text-white font-bold text-sm">GS</span>
-            </div>
-            <span className="font-heading font-bold text-xl text-greensky-800">Green Sky</span>
+            <img 
+              src={logo} 
+              alt="Green Sky Logo" 
+              className="w-auto" 
+              style={{ height: '50px' }}
+            />
           </div>
           
           <nav className="hidden md:flex items-center space-x-6">
@@ -79,6 +82,16 @@ const Header = () => {
             <Badge variant="secondary" className="hidden sm:flex bg-greensky-100 text-greensky-800">
               🌱 Carbono Neutro
             </Badge>
+            {profile?.admin && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="hidden md:flex border-greensky-300 hover:bg-greensky-50 text-greensky-700 font-medium"
+                onClick={() => navigate("/admin")}
+              >
+                Área Administrativa
+              </Button>
+            )}
             {user ? (
               <div className="relative">
                 <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white font-semibold transition-colors shadow" onClick={() => setMenuOpen((v) => !v)}>
@@ -95,6 +108,14 @@ const Header = () => {
                     >
                       Editar Perfil
                     </button>
+                    {profile?.admin && (
+                      <button
+                        className="block w-full text-left px-4 py-2 hover:bg-gray-100 text-greensky-700 font-medium"
+                        onClick={() => { setMenuOpen(false); navigate("/admin"); }}
+                      >
+                        Área Administrativa
+                      </button>
+                    )}
                     {profile && profile.pilot && (
                       <button
                         className="block w-full text-left px-4 py-2 hover:bg-gray-100"

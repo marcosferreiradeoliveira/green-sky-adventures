@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { UserCircle } from "lucide-react";
@@ -10,6 +11,7 @@ import { auth, db } from "@/lib/firebase";
 import { doc, setDoc, getDoc } from "firebase/firestore";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { Country, State, City } from "country-state-city";
 
 const EditProfile = () => {
   const [form, setForm] = useState({
@@ -17,9 +19,27 @@ const EditProfile = () => {
     firstName: "",
     lastName: "",
     city: "",
+    cityCode: "",
     state: "",
-    country: ""
+    stateCode: "",
+    country: "",
+    countryCode: ""
   });
+  
+  // Get all countries
+  const countries = useMemo(() => Country.getAllCountries(), []);
+  
+  // Get states based on selected country
+  const states = useMemo(() => {
+    if (!form.countryCode) return [];
+    return State.getStatesOfCountry(form.countryCode);
+  }, [form.countryCode]);
+  
+  // Get cities based on selected state and country
+  const cities = useMemo(() => {
+    if (!form.countryCode || !form.stateCode) return [];
+    return City.getCitiesOfState(form.countryCode, form.stateCode);
+  }, [form.countryCode, form.stateCode]);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState("");
   const [error, setError] = useState("");
@@ -39,8 +59,11 @@ const EditProfile = () => {
             firstName: data.firstName || "",
             lastName: data.lastName || "",
             city: data.city || "",
+            cityCode: data.cityCode || "",
             state: data.state || "",
-            country: data.country || ""
+            stateCode: data.stateCode || "",
+            country: data.country || "",
+            countryCode: data.countryCode || ""
           });
         }
       }
@@ -49,7 +72,46 @@ const EditProfile = () => {
   }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+    setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
+  };
+  
+  const handleCountryChange = (value: string) => {
+    const country = countries.find(c => c.isoCode === value);
+    if (country) {
+      setForm(prev => ({
+        ...prev,
+        country: country.name,
+        countryCode: country.isoCode,
+        state: "",
+        stateCode: "",
+        city: "",
+        cityCode: ""
+      }));
+    }
+  };
+  
+  const handleStateChange = (value: string) => {
+    const state = states.find(s => s.isoCode === value);
+    if (state) {
+      setForm(prev => ({
+        ...prev,
+        state: state.name,
+        stateCode: state.isoCode,
+        city: "",
+        cityCode: ""
+      }));
+    }
+  };
+  
+  const handleCityChange = (value: string) => {
+    const city = cities.find(c => c.name === value);
+    if (city) {
+      setForm(prev => ({
+        ...prev,
+        city: city.name,
+        cityCode: city.stateCode
+      }));
+    }
   };
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -76,13 +138,31 @@ const EditProfile = () => {
     setLoading(true);
     setSuccess("");
     setError("");
+    
     if (!user) {
       setError("Usuário não autenticado");
       setLoading(false);
       return;
     }
+    
+    // Validate location data
+    if (!form.country || !form.state || !form.city) {
+      setError("Por favor, selecione país, estado e cidade");
+      setLoading(false);
+      return;
+    }
+    
     try {
-      await setDoc(doc(db, "users", user.uid), { ...form, email: user.email }, { merge: true });
+      const userData = {
+        ...form,
+        email: user.email,
+        // Keep the existing fields and add the new ones
+        countryCode: form.countryCode,
+        stateCode: form.stateCode,
+        cityCode: form.cityCode
+      };
+      
+      await setDoc(doc(db, "users", user.uid), userData, { merge: true });
       setSuccess("Perfil atualizado com sucesso!");
       setTimeout(() => {
         navigate("/perfil");
@@ -119,9 +199,64 @@ const EditProfile = () => {
               </div>
               <Input name="firstName" placeholder="Nome" value={form.firstName} onChange={handleChange} required />
               <Input name="lastName" placeholder="Sobrenome" value={form.lastName} onChange={handleChange} required />
-              <Input name="city" placeholder="Cidade" value={form.city} onChange={handleChange} required />
-              <Input name="state" placeholder="Estado" value={form.state} onChange={handleChange} required />
-              <Input name="country" placeholder="País" value={form.country} onChange={handleChange} required />
+              {/* Country Dropdown */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">País</label>
+                <Select onValueChange={handleCountryChange} value={form.countryCode}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione um país" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {countries.map((country) => (
+                      <SelectItem key={country.isoCode} value={country.isoCode}>
+                        {country.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              {/* State Dropdown */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">Estado</label>
+                <Select 
+                  onValueChange={handleStateChange} 
+                  value={form.stateCode}
+                  disabled={!form.countryCode}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={form.countryCode ? "Selecione um estado" : "Selecione um país primeiro"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {states.map((state) => (
+                      <SelectItem key={state.isoCode} value={state.isoCode}>
+                        {state.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              {/* City Dropdown */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">Cidade</label>
+                <Select 
+                  onValueChange={handleCityChange} 
+                  value={form.city}
+                  disabled={!form.stateCode}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={form.stateCode ? "Selecione uma cidade" : "Selecione um estado primeiro"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {cities.map((city) => (
+                      <SelectItem key={city.name} value={city.name}>
+                        {city.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <Button type="submit" className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold" disabled={loading}>
                 {loading ? "Salvando..." : "Salvar"}
               </Button>

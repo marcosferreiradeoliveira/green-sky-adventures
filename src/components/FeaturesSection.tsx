@@ -1,6 +1,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import logo from "@/assets/logo.png";
 
 const FeaturesSection = () => {
   const features = [
@@ -34,7 +35,7 @@ const FeaturesSection = () => {
             o Mundo
           </h2>
           <p className="text-xl text-gray-600">
-            No Green Sky, cada voo é uma oportunidade de criar impacto positivo. 
+            Na nossa plataforma, cada voo é uma oportunidade de criar impacto positivo. 
             Descubra como sua paixão pela aventura pode fazer a diferença.
           </p>
         </div>

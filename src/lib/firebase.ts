@@ -2,7 +2,7 @@
 import { initializeApp } from "firebase/app";
 import { getAnalytics, logEvent, setUserProperties, setUserId, isSupported } from "firebase/analytics";
 import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { getFirestore, doc, setDoc } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 import { Analytics, EventParams } from "firebase/analytics";
 
@@ -81,12 +81,28 @@ export const trackEvent = (eventName: string, params?: EventParams) => {
 
 // Initialize all services
 try {
+  console.log('Inicializando serviços do Firebase...');
   initAnalytics();
+  
+  // Inicializar autenticação
   auth = getAuth(app);
+  console.log('Auth inicializado:', auth?.app?.name);
+  
+  // Inicializar Firestore
   db = getFirestore(app);
+  console.log('Firestore inicializado:', db?.app?.name);
+  
+  // Inicializar Storage
   storage = getStorage(app);
+  console.log('Storage inicializado:', storage?.app?.name);
+  
+  // Verificar conexão com o Firestore (apenas log, sem escrita desnecessária)
+  if (db) {
+    console.log('Firestore conectado com sucesso!');
+  }
 } catch (error) {
-  console.warn("Firebase services initialization failed:", error);
+  console.error('Falha na inicialização dos serviços do Firebase:', error);
+  throw error; // Lançar o erro para que o aplicativo não continue em um estado inválido
 }
 
 export { app, analytics, auth, db, storage };

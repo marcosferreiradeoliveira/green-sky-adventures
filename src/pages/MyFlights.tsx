@@ -215,12 +215,29 @@ const MyFlights = () => {
 
   if (!user) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center">
+      <div className="min-h-screen bg-background flex flex-col">
         <Header />
-        <div className="flex-1 flex flex-col items-center justify-center">
-          <h1 className="font-heading font-bold text-2xl mt-4">Faça login para ver suas milhas</h1>
-          <Button className="mt-4 bg-green-600 hover:bg-green-700 text-white font-semibold" onClick={() => navigate("/login")}>Entrar</Button>
-        </div>
+        <main className="flex-1 container mx-auto px-4 py-8 flex flex-col items-center justify-center text-center">
+          <div className="w-full max-w-2xl mx-auto">
+            <h1 className="font-heading font-bold text-2xl md:text-3xl mb-6">Faça login para ver suas milhas</h1>
+            <div className="space-y-4">
+              <Button 
+                className="bg-green-600 hover:bg-green-700 text-white font-semibold px-8 py-6 text-lg w-full md:w-auto"
+                onClick={() => navigate("/login")}
+              >
+                Entrar
+              </Button>
+              <div className="text-gray-600">
+                <p>Não tem conta? <button 
+                  onClick={() => navigate("/register")} 
+                  className="text-green-600 hover:text-green-800 font-semibold underline"
+                >
+                  Crie agora
+                </button> e gere propósito desde já!</p>
+              </div>
+            </div>
+          </div>
+        </main>
         <Footer />
       </div>
     );
@@ -296,7 +313,7 @@ const MyFlights = () => {
               <CardHeader>
                 <CardTitle className="font-heading text-xl text-gray-900 flex items-center">
                   <span className="mr-2">🌱</span>
-                  Seu Impacto Green Sky
+                  Seu Impacto
                 </CardTitle>
               </CardHeader>
               <CardContent className="flex-1 flex flex-col justify-center">

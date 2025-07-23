@@ -131,7 +131,7 @@ const Profile = () => {
               <h2 className="font-heading font-bold text-3xl md:text-4xl mb-2">
                 {milesBalance.toLocaleString()} ✈️
               </h2>
-              <p className="text-white/90 text-lg">Milhas Green Sky</p>
+              <p className="text-white/90 text-lg">Milhas</p>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
               <div>

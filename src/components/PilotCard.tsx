@@ -6,6 +6,8 @@ import { auth, db } from "@/lib/firebase";
 import { addDoc, collection, doc, updateDoc, arrayUnion, serverTimestamp } from "firebase/firestore";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { useState, useEffect } from "react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useNavigate } from "react-router-dom";
 
 interface PilotCardProps {
   pilot: {
@@ -27,6 +29,8 @@ interface PilotCardProps {
 const PilotCard = ({ pilot }: PilotCardProps) => {
   const { toast } = useToast();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, setCurrentUser);
@@ -34,6 +38,11 @@ const PilotCard = ({ pilot }: PilotCardProps) => {
   }, []);
 
   const handleContact = async () => {
+    if (!currentUser) {
+      setShowAuthModal(true);
+      return;
+    }
+
     if (pilot.whatsapp) {
       try {
         // Verificar se pilot.uid existe antes de criar o contato
@@ -127,6 +136,41 @@ const PilotCard = ({ pilot }: PilotCardProps) => {
           Entrar em Contato
         </Button>
       </CardContent>
+      
+      {/* Authentication Required Modal */}
+      <Dialog open={showAuthModal} onOpenChange={setShowAuthModal}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold text-center mb-2">Cadastro Necessário</DialogTitle>
+            <DialogDescription className="text-center">
+              Para entrar em contato com os pilotos e começar a gerar impacto, você precisa ter uma conta no Green Sky.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-gray-700 text-center mb-4">
+              Crie sua conta gratuitamente em menos de 2 minutos e comece sua aventura sustentável!
+            </p>
+          </div>
+          <DialogFooter className="flex flex-col sm:flex-row gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => setShowAuthModal(false)}
+              className="w-full"
+            >
+              Agora não
+            </Button>
+            <Button 
+              onClick={() => {
+                setShowAuthModal(false);
+                navigate('/register');
+              }}
+              className="w-full bg-green-600 hover:bg-green-700"
+            >
+              Criar Conta
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 };

@@ -1,4 +1,6 @@
 
+import logo from "@/assets/logo.png";
+
 const Footer = () => {
   return (
     <footer className="bg-gray-900 text-white py-12">
@@ -6,10 +8,12 @@ const Footer = () => {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div className="col-span-1 md:col-span-2">
             <div className="flex items-center space-x-2 mb-4">
-              <div className="w-8 h-8 bg-gradient-primary rounded-full flex items-center justify-center">
-                <span className="text-white font-bold text-sm">GS</span>
-              </div>
-              <span className="font-heading font-bold text-xl">Green Sky</span>
+              <img 
+                src={logo} 
+                alt="Green Sky Logo" 
+                className="h-10 w-auto" 
+                style={{ height: '40px' }}
+              />
             </div>
             <p className="text-gray-400 mb-4 max-w-md">
               Conectando aventureiros a pilotos de voo livre com propósito. 

@@ -11,14 +11,32 @@ import { auth } from "@/lib/firebase";
 import { addDoc, collection, updateDoc, arrayUnion, serverTimestamp } from "firebase/firestore";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { useToast } from "@/hooks/use-toast";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+
+interface Pilot {
+  id: string;
+  uid: string;
+  name: string;
+  whatsapp?: string;
+  // Add other pilot properties as needed
+  [key: string]: any; // For any additional properties
+}
 
 const ProfilePilot = () => {
   const { id } = useParams();
-  const [pilot, setPilot] = useState<any>(null);
+  const [pilot, setPilot] = useState<Pilot | null>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const { toast } = useToast();
+  const [showAuthModal, setShowAuthModal] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -26,7 +44,14 @@ const ProfilePilot = () => {
       const docRef = doc(db, "pilots", id);
       const snap = await getDoc(docRef);
       if (snap.exists()) {
-        const pilotData = { id: snap.id, ...snap.data() };
+        const data = snap.data();
+        const pilotData: Pilot = {
+          id: snap.id,
+          uid: data.uid,
+          name: data.name || '',
+          whatsapp: data.whatsapp,
+          ...data
+        };
         console.log('Pilot data fetched:', pilotData);
         console.log('Pilot UID field:', pilotData.uid);
         setPilot(pilotData);
@@ -42,6 +67,11 @@ const ProfilePilot = () => {
   }, []);
 
   const handleContact = async () => {
+    if (!currentUser) {
+      setShowAuthModal(true);
+      return;
+    }
+
     if (pilot.whatsapp) {
       try {
         // Verificar se pilot.uid existe antes de criar o contato
@@ -52,7 +82,7 @@ const ProfilePilot = () => {
         }
         
         const contactData = {
-          userId: currentUser ? currentUser.uid : null,
+          userId: currentUser.uid,
           pilotId: pilot.uid, // UID do piloto da collection pilots
           timestamp: serverTimestamp(),
           realized: false,
@@ -64,19 +94,36 @@ const ProfilePilot = () => {
         await updateDoc(doc(db, "pilots", pilot.id), {
           contacts: arrayUnion(contactRef.id)
         });
-        if (currentUser) {
-          await updateDoc(doc(db, "users", currentUser.uid), {
-            contacts: arrayUnion(contactRef.id)
-          });
-        }
+        
+        await updateDoc(doc(db, "users", currentUser.uid), {
+          contacts: arrayUnion(contactRef.id)
+        });
+
+        const msg = encodeURIComponent(`Olá ${pilot.name}, encontrei seu perfil na nossa plataforma e gostaria de saber mais sobre voos!`);
+        const phone = pilot.whatsapp.replace(/\D/g, "");
+        window.open(`https://wa.me/${phone}?text=${msg}`, "_blank");
+        
+        toast({
+          title: "Contato Iniciado! 🚁",
+          description: `Você será direcionado para conversar com ${pilot.name}. Confirme seu voo e ganhe milhas bônus!`,
+          duration: 5000,
+        });
       } catch (err) {
-        // Pode adicionar um toast de erro se desejar
+        console.error("Erro ao criar contato:", err);
+        toast({
+          title: "Erro",
+          description: "Não foi possível iniciar o contato. Tente novamente.",
+          variant: "destructive",
+          duration: 5000,
+        });
       }
-      const msg = encodeURIComponent(`Olá ${pilot.name}, encontrei seu perfil no Green Sky e gostaria de saber mais sobre voos!`);
-      const phone = pilot.whatsapp.replace(/\D/g, "");
-      window.open(`https://wa.me/${phone}?text=${msg}`, "_blank");
     } else {
-      // Pode adicionar um toast de erro se desejar
+      toast({
+        title: "Ops!",
+        description: "Este piloto não possui WhatsApp cadastrado.",
+        variant: "destructive",
+        duration: 5000,
+      });
     }
   };
 
@@ -85,6 +132,39 @@ const ProfilePilot = () => {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
+      <Dialog open={showAuthModal} onOpenChange={setShowAuthModal}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold text-center mb-2">Cadastro Necessário</DialogTitle>
+            <DialogDescription className="text-center">
+              Para entrar em contato com os pilotos e começar a gerar impacto, você precisa ter uma conta na nossa plataforma.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-gray-700 text-center mb-4">
+              Crie sua conta gratuitamente em menos de 2 minutos e comece sua aventura sustentável!
+            </p>
+          </div>
+          <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:gap-4">
+            <Button 
+              variant="outline" 
+              className="w-full" 
+              onClick={() => setShowAuthModal(false)}
+            >
+              Agora não
+            </Button>
+            <Button 
+              className="w-full bg-green-600 hover:bg-green-700"
+              onClick={() => {
+                setShowAuthModal(false);
+                navigate("/register");
+              }}
+            >
+              Criar Conta
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <Header />
       <main className="flex-1 w-full px-2 md:px-8 py-8">
         {/* Fotos demonstrativas em destaque no topo */}
@@ -113,10 +193,10 @@ const ProfilePilot = () => {
               {/* Botão fixo no canto inferior direito dentro do carousel */}
               <div className="absolute bottom-4 right-4 z-10">
                 <Button 
-                  className="bg-white hover:bg-gray-50 text-green-600 border-2 border-green-600 font-bold px-12 py-6 text-2xl rounded-2xl shadow-2xl transform hover:scale-105 transition-all duration-300 flex items-center gap-4"
+                  className="bg-white hover:bg-gray-50 text-green-600 border-2 border-green-600 font-medium px-12 py-8 text-xl rounded-2xl shadow-2xl transform hover:scale-105 transition-all duration-300 flex items-center gap-3 w-80"
                   onClick={handleContact}
                 >
-                  <span className="text-3xl">🌱</span>
+                  <span className="text-2xl">🌱</span>
                   Aventure-se com propósito!
                 </Button>
               </div>
@@ -196,7 +276,7 @@ const ProfilePilot = () => {
               </div>
               
               {/* Botão ocupando toda a largura do card, abaixo de tudo */}
-              <Button className="mt-6 bg-green-600 hover:bg-green-700 text-white font-semibold w-full h-16 text-xl" onClick={handleContact}>
+              <Button className="mt-6 bg-green-600 hover:bg-green-700 text-white font-medium w-96 h-20 text-lg mx-auto" onClick={handleContact}>
                 Aventure-se com propósito
               </Button>
             </CardContent>
