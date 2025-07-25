@@ -2,7 +2,7 @@
 import { initializeApp } from "firebase/app";
 import { getAnalytics, logEvent, setUserProperties, setUserId, isSupported } from "firebase/analytics";
 import { getAuth } from "firebase/auth";
-import { getFirestore, doc, setDoc } from "firebase/firestore";
+import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 import { Analytics, EventParams } from "firebase/analytics";
 
@@ -35,30 +35,33 @@ const firebaseConfig = hasFirebaseConfig ? {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// Initialize services conditionally
+// Initialize services with null defaults
 let analytics: Analytics | null = null;
-let auth: any = null;
-let db: any = null;
-let storage: any = null;
+let auth = getAuth(app);
+let db = getFirestore(app);
+let storage = getStorage(app);
 
 // Initialize analytics if supported and in production
 const initAnalytics = async () => {
-  if (hasFirebaseConfig) {
-    try {
-      const isAnalyticsSupported = await isSupported();
-      if (isAnalyticsSupported) {
-        analytics = getAnalytics(app);
-        // Set user properties if needed
-        if (auth.currentUser) {
-          setUserId(analytics, auth.currentUser.uid);
-          setUserProperties(analytics, {
-            user_type: 'visitor', // Will be updated after login
-          });
-        }
+  if (!hasFirebaseConfig) return null;
+  
+  try {
+    const isAnalyticsSupported = await isSupported();
+    if (isAnalyticsSupported) {
+      analytics = getAnalytics(app);
+      // Set user properties if needed
+      if (auth.currentUser) {
+        setUserId(analytics, auth.currentUser.uid);
+        setUserProperties(analytics, {
+          user_type: 'visitor', // Will be updated after login
+        });
       }
-    } catch (error) {
-      console.error('Analytics initialization error:', error);
+      return analytics;
     }
+    return null;
+  } catch (error) {
+    console.error('Analytics initialization error:', error);
+    return null;
   }
 };
 
@@ -70,7 +73,8 @@ export const logPageView = (pageTitle: string, pagePath: string) => {
     page_title: pageTitle,
     page_path: pagePath,
     page_location: window.location.href,
-  });};
+  });
+};
 
 // Track custom events
 export const trackEvent = (eventName: string, params?: EventParams) => {
@@ -79,30 +83,30 @@ export const trackEvent = (eventName: string, params?: EventParams) => {
   logEvent(analytics, eventName, params);
 };
 
-// Initialize all services
-try {
-  console.log('Inicializando serviços do Firebase...');
-  initAnalytics();
-  
-  // Inicializar autenticação
-  auth = getAuth(app);
-  console.log('Auth inicializado:', auth?.app?.name);
-  
-  // Inicializar Firestore
-  db = getFirestore(app);
-  console.log('Firestore inicializado:', db?.app?.name);
-  
-  // Inicializar Storage
-  storage = getStorage(app);
-  console.log('Storage inicializado:', storage?.app?.name);
-  
-  // Verificar conexão com o Firestore (apenas log, sem escrita desnecessária)
-  if (db) {
-    console.log('Firestore conectado com sucesso!');
+// Initialize Firebase services
+const initFirebase = async () => {
+  try {
+    console.log('Initializing Firebase services...');
+    
+    // Initialize analytics (non-blocking)
+    initAnalytics().then(analyticsInstance => {
+      analytics = analyticsInstance;
+      console.log('Analytics initialized:', analytics ? 'success' : 'not supported');
+    }).catch(err => {
+      console.error('Error initializing analytics:', err);
+    });
+    
+    console.log('Firebase services initialized successfully');
+    return { app, analytics, auth, db, storage };
+  } catch (error) {
+    console.error('Failed to initialize Firebase services:', error);
+    // Return the services that did initialize successfully
+    return { app, analytics, auth, db, storage };
   }
-} catch (error) {
-  console.error('Falha na inicialização dos serviços do Firebase:', error);
-  throw error; // Lançar o erro para que o aplicativo não continue em um estado inválido
-}
+};
 
+// Export a promise that resolves when Firebase is initialized
+export const firebaseInit = initFirebase();
+
+// Export the initialized services
 export { app, analytics, auth, db, storage };

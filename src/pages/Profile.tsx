@@ -7,14 +7,15 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { UserCircle } from "lucide-react";
+import { UserCircle, Loader2 } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { auth, db } from "@/lib/firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc, serverTimestamp, collection, addDoc } from "firebase/firestore";
 import { onAuthStateChanged, User } from "firebase/auth";
 import Register from "./Register";
 
 const Profile = () => {
-  const [milesBalance] = useState(1250);
+  const [milesBalance, setMilesBalance] = useState(0);
   const [referralLink] = useState("https://greensky.com/ref/user123");
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -22,6 +23,8 @@ const Profile = () => {
   const [profile, setProfile] = useState<any>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [redirecting, setRedirecting] = useState(false);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [isConverting, setIsConverting] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
@@ -33,6 +36,8 @@ const Profile = () => {
         if (snap.exists()) {
           const data = snap.data();
           setProfile(data);
+          // Atualiza o saldo de milhas do estado local
+          setMilesBalance(data.miles || 0);
           if (!data.firstName || !data.lastName || !data.photo) {
             setRedirecting(true);
             navigate("/editar-perfil");
@@ -58,11 +63,98 @@ const Profile = () => {
     });
   };
 
-  const handleMilesAction = (action: string) => {
-    toast({
-      title: `${action} em desenvolvimento! ⏳`,
-      description: "Esta funcionalidade estará disponível em breve.",
-    });
+  const convertMilesToCoupon = async () => {
+    if (!user) return;
+    
+    setIsConverting(true);
+    try {
+      // 1. Verificar se o usuário tem milhas suficientes
+      if (milesBalance < 1000) {
+        toast({
+          title: "Milhas insuficientes",
+          description: "Você precisa de pelo menos 1.000 milhas para gerar um cupom de voo duplo.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // 2. Criar o documento do cupom
+      const couponData = {
+        userId: user.uid,
+        recipientId: user.uid, // O próprio usuário é o destinatário
+        amount: 1, // 1 voo duplo
+        used: false,
+        createdAt: serverTimestamp(),
+        expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // Expira em 1 ano
+        type: "double_flight"
+      };
+
+      // 3. Adicionar o cupom à coleção 'coupons'
+      const docRef = await addDoc(collection(db, "coupons"), couponData);
+
+      // 4. Atualizar as milhas do usuário
+      const userRef = doc(db, "users", user.uid);
+      await updateDoc(userRef, {
+        miles: (profile?.miles || 0) - 1000
+      });
+
+      // 5. Atualizar o estado local
+      setMilesBalance(prev => prev - 1000);
+      setProfile((prev: any) => ({
+        ...prev,
+        miles: (prev?.miles || 0) - 1000
+      }));
+
+      // 6. Mostrar mensagem de sucesso
+      toast({
+        title: "Cupom gerado com sucesso! 🎉",
+        description: (
+          <div className="space-y-2">
+            <p>Seu cupom de voo duplo foi gerado com sucesso!</p>
+            <p className="text-sm">
+              <span>Você pode visualizá-lo na seção </span>
+              <button 
+                onClick={() => navigate('/meus-cupons')}
+                className="text-blue-600 hover:underline font-medium"
+              >
+                Meus Cupons
+              </button>.
+            </p>
+          </div>
+        ),
+      });
+    } catch (error) {
+      console.error("Erro ao converter milhas:", error);
+      toast({
+        title: "Erro ao gerar cupom",
+        description: "Ocorreu um erro ao processar sua solicitação. Tente novamente mais tarde.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsConverting(false);
+      setShowConfirmDialog(false);
+    }
+  };
+
+  const handleMilesAction = (action: string, callback?: () => void) => {
+    if (!user) {
+      toast({
+        title: "Ação não autorizada",
+        description: "Você precisa estar logado para realizar esta ação.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (action === "Converter em voo") {
+      setShowConfirmDialog(true);
+    } else {
+      toast({
+        title: `${action} em desenvolvimento! ⏳`,
+        description: "Esta funcionalidade estará disponível em breve.",
+      });
+      callback?.();
+    }
   };
 
   if (redirecting) return null;
@@ -165,13 +257,27 @@ const Profile = () => {
                   onClick={() => handleMilesAction("Converter em voo")}
                   variant="outline" 
                   className="w-full justify-start h-auto p-4 border-greensky-200 hover:bg-greensky-50 hover:border-greensky-300"
+                  disabled={isConverting || milesBalance < 1000}
+                  title={milesBalance < 1000 ? "Você precisa de pelo menos 1.000 milhas para gerar um cupom" : ""}
                 >
                   <div className="text-left">
                     <div className="font-semibold text-gray-900 mb-1">
-                      🚁 Converter em um voo duplo para você
+                      {isConverting ? (
+                        <span className="flex items-center">
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Processando...
+                        </span>
+                      ) : (
+                        <span>🚁 Converter em um voo duplo para você</span>
+                      )}
                     </div>
                     <div className="text-sm text-gray-600">
                       1.000 milhas = 1 voo duplo
+                      {milesBalance < 1000 && (
+                        <div className="text-amber-600 text-xs mt-1">
+                          Você precisa de mais {1000 - milesBalance} milhas para gerar um cupom
+                        </div>
+                      )}
                     </div>
                   </div>
                 </Button>
@@ -300,6 +406,40 @@ const Profile = () => {
             </div>
           </CardContent>
         </Card>
+
+        {/* Diálogo de Confirmação */}
+        <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Confirmar Conversão de Milhas</DialogTitle>
+              <DialogDescription className="pt-4">
+                Você está prestes a converter 1.000 milhas em um cupom de voo duplo. 
+                Tem certeza que deseja continuar?
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="mt-4">
+              <Button 
+                variant="outline" 
+                onClick={() => setShowConfirmDialog(false)}
+                disabled={isConverting}
+              >
+                Cancelar
+              </Button>
+              <Button 
+                onClick={convertMilesToCoupon}
+                disabled={isConverting}
+                className="bg-green-600 hover:bg-green-700"
+              >
+                {isConverting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Convertendo...
+                  </>
+                ) : 'Confirmar Conversão'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </main>
 
       <Footer />

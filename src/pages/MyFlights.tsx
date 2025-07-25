@@ -6,7 +6,19 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { UserCircle } from "lucide-react";
 import { auth, db } from "@/lib/firebase";
-import { collection, query, where, getDocs, doc, getDoc, updateDoc } from "firebase/firestore";
+import { 
+  collection, 
+  query, 
+  where, 
+  getDocs, 
+  doc, 
+  getDoc, 
+  updateDoc, 
+  addDoc,
+  orderBy,
+  limit,
+  getCountFromServer 
+} from "firebase/firestore";
 import { onAuthStateChanged, User } from "firebase/auth";
 import {
   AlertDialog,
@@ -43,6 +55,128 @@ const MyFlights = () => {
   const [ratingValue, setRatingValue] = useState(0);
   const [ratingText, setRatingText] = useState("");
   const [showRewards, setShowRewards] = useState(false);
+  const [coupons, setCoupons] = useState<any[]>([]);
+  const [loadingCoupons, setLoadingCoupons] = useState(true);
+
+  // Carrega os cupons do usuário
+  useEffect(() => {
+    if (!user) return;
+    
+    const loadCoupons = async () => {
+      try {
+        console.log('Iniciando carregamento de cupons para o usuário:', user.uid);
+        setLoadingCoupons(true);
+        
+        // Primeiro, verifica se o usuário tem permissão para acessar a coleção
+        console.log('Verificando permissões...');
+        
+        // Tenta fazer uma consulta simples para ver se há algum problema de permissão
+        const testQuery = query(collection(db, 'coupons'), limit(1));
+        const testSnapshot = await getCountFromServer(testQuery);
+        console.log('Teste de permissão bem-sucedido. Total de cupons na coleção:', testSnapshot.data().count);
+        
+        // Agora busca os cupons do usuário
+        console.log('Buscando cupons para o usuário:', user.uid);
+        const q = query(
+          collection(db, 'coupons'),
+          where('userId', '==', user.uid),
+          orderBy('createdAt', 'desc')
+        );
+        
+        console.log('Consulta criada, executando...');
+        const querySnapshot = await getDocs(q);
+        console.log('Documentos encontrados:', querySnapshot.docs.length);
+        
+        const userCoupons = querySnapshot.docs.map(doc => {
+          const data = doc.data();
+          console.log('Processando cupom:', doc.id, data);
+          
+          // Função auxiliar para converter Firestore Timestamp para Date
+          const toDate = (timestamp: any) => {
+            try {
+              if (!timestamp) return null;
+              // Se for um objeto Timestamp do Firestore
+              if (typeof timestamp.toDate === 'function') {
+                return timestamp.toDate();
+              }
+              // Se já for um objeto Date (pode acontecer em alguns casos)
+              if (timestamp instanceof Date) {
+                return timestamp;
+              }
+              // Se for um timestamp em milissegundos
+              if (typeof timestamp === 'number') {
+                return new Date(timestamp);
+              }
+              return null;
+            } catch (error) {
+              console.error('Erro ao converter timestamp:', timestamp, error);
+              return null;
+            }
+          };
+          
+          return {
+            id: doc.id,
+            ...data,
+            // Converte os timestamps do Firestore para objetos Date do JavaScript
+            createdAt: toDate(data.createdAt) || new Date(),
+            expiresAt: toDate(data.expiresAt),
+            usedAt: data.usedAt ? toDate(data.usedAt) : null
+          };
+        });
+        
+        console.log('Cupons processados com sucesso:', userCoupons);
+        setCoupons(userCoupons);
+      } catch (error) {
+        console.error('Erro detalhado ao carregar cupons:');
+        console.error('Tipo de erro:', typeof error);
+        console.error('Mensagem de erro:', error instanceof Error ? error.message : 'Erro desconhecido');
+        console.error('Objeto de erro completo:', error);
+        
+        if (error instanceof Error) {
+          console.error('Stack trace:', error.stack);
+          
+          // Verifica se é um erro de permissão
+          if (error.message.includes('permission-denied') || error.message.includes('Missing or insufficient permissions')) {
+            console.error('ERRO DE PERMISSÃO: O usuário não tem permissão para acessar a coleção de cupons');
+            window.alert('Você não tem permissão para visualizar os cupons. Por favor, entre em contato com o suporte.');
+            return;
+          }
+        }
+        
+        window.alert('Não foi possível carregar seus cupons. Por favor, tente novamente mais tarde.');
+      } finally {
+        setLoadingCoupons(false);
+      }
+    };
+    
+    loadCoupons();
+  }, [user]);
+
+  // Função para formatar a data
+  const formatDate = (date: Date | null | undefined) => {
+    if (!date) return 'N/A';
+    try {
+      return new Intl.DateTimeFormat('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      }).format(date);
+    } catch (error) {
+      console.error('Erro ao formatar data:', date, error);
+      return 'Data inválida';
+    }
+  };
+
+  // Função para obter o status do cupom
+  const getCouponStatus = (coupon: any) => {
+    if (coupon.used) return { text: 'Utilizado', className: 'bg-gray-100 text-gray-800' };
+    if (coupon.expiresAt && coupon.expiresAt < new Date()) {
+      return { text: 'Expirado', className: 'bg-red-100 text-red-800' };
+    }
+    return { text: 'Ativo', className: 'bg-green-100 text-green-800' };
+  };
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
@@ -198,6 +332,154 @@ const MyFlights = () => {
     fetchClientes();
   }, [user, profile]);
 
+  useEffect(() => {
+    if (profile) {
+      console.log('=== DEBUG: Profile Data ===');
+      console.log('Profile:', profile);
+      console.log('Profile miles (raw):', profile.miles, 'Type:', typeof profile.miles);
+      console.log('Realized contacts count:', contacts.filter(c => c.realized).length);
+      
+      // Check if miles is a string and log its value
+      if (typeof profile.miles === 'string') {
+        console.log('Profile miles as number:', Number(profile.miles));
+      } else if (typeof profile.miles === 'number') {
+        console.log('Profile miles is already a number');
+      } else {
+        console.log('No valid miles found in profile');
+      }
+    }
+  }, [profile, contacts]);
+
+  // Calculate miles - prioritize profile.miles if it exists
+  const calculateMiles = () => {
+    // Debug: Log profile data for troubleshooting
+    console.log('=== DEBUG: Calculating Miles ===');
+    console.log('Profile miles (raw):', profile?.miles, 'Type:', typeof profile?.miles);
+    console.log('Realized contacts count:', contacts.filter(c => c.realized).length);
+    
+    // If profile has miles defined and it's not null/undefined
+    if (profile?.miles != null) {
+      const profileMiles = Number(profile.miles);
+      console.log('Using profile miles:', profileMiles);
+      return isNaN(profileMiles) ? 0 : profileMiles;
+    }
+    
+    // Fallback to calculation based on realized contacts
+    const calculated = contacts.filter(c => c.realized).length * 250;
+    console.log('Calculating miles from contacts:', calculated);
+    return calculated;
+  };
+
+  // Calculate miles once at the top level
+  const miles = calculateMiles();
+  console.log('Final miles value:', miles, 'Type:', typeof miles);
+  
+  const treesPlanted = Math.floor(miles / 250);
+  const co2Compensated = treesPlanted * 150;
+
+  // Função para feedback dos botões de milhas
+  const handleMilesAction = async (action: string) => {
+    if (action === 'Converter em voo') {
+      // Verifica se o usuário tem milhas suficientes (1000 milhas para um voo duplo)
+      if (miles < 1000) {
+        window.alert(`Você precisa de pelo menos 1000 milhas para converter em um voo duplo. Você tem ${miles} milhas.`);
+        return;
+      }
+
+      try {
+        // Atualiza o perfil do usuário subtraindo as milhas
+        const user = auth.currentUser;
+        if (!user) {
+          window.alert('Usuário não autenticado');
+          return;
+        }
+
+        const userRef = doc(db, 'users', user.uid);
+        const newMiles = Math.max(0, miles - 1000); // Garante que não fique negativo
+        const currentDate = new Date();
+        
+        // Gera um número de cupom único
+        const couponNumber = `GS-${Date.now().toString(36).toUpperCase()}-${Math.floor(Math.random() * 1000).toString().padStart(4, '0')}`;
+        
+        // Cria o documento do cupom na coleção 'coupons'
+        const couponData = {
+          userId: user.uid,
+          userEmail: user.email || '',
+          couponNumber: couponNumber,
+          type: 'dual_flight',
+          value: 1, // 1 voo duplo
+          used: false,
+          createdAt: currentDate,
+          expiresAt: new Date(currentDate.getFullYear(), currentDate.getMonth() + 6, currentDate.getDate()), // Expira em 6 meses
+          usedAt: null
+        };
+        
+        // Adiciona o cupom à coleção 'coupons'
+        await addDoc(collection(db, 'coupons'), couponData);
+        
+        // Atualiza o perfil do usuário
+        await updateDoc(userRef, {
+          miles: newMiles,
+          hasDualFlight: true,
+          dualFlightDate: currentDate,
+          lastCouponNumber: couponNumber
+        });
+
+        // Atualiza o estado local
+        setProfile(prev => ({
+          ...prev,
+          miles: newMiles,
+          hasDualFlight: true,
+          dualFlightDate: currentDate,
+          lastCouponNumber: couponNumber
+        }));
+
+        window.alert(`Parabéns! Você converteu 1000 milhas em 1 voo duplo!\nSeu número do cupom: ${couponNumber}`);
+      } catch (error) {
+        console.error('Erro ao converter milhas:', error);
+        window.alert('Ocorreu um erro ao processar sua solicitação. Por favor, tente novamente.');
+      }
+    } else {
+      // Mantém o comportamento original para outras ações
+      window.alert(`${action} em desenvolvimento!`);
+    }
+  };
+
+  // Função para exportar clientes como CSV
+  function exportClientesCSV(clientes: { name: string; email: string }[]) {
+    if (!clientes.length) return;
+    const header = 'Nome,Email\n';
+    const rows = clientes.map(c => `"${c.name}","${c.email}"`).join('\n');
+    const csvContent = header + rows;
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'clientes.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  // Função para copiar texto para a área de transferência
+  function copyToClipboard(text: string, idx?: number) {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text);
+    } else {
+      // Fallback para navegadores antigos
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+    }
+    if (typeof idx === 'number') {
+      setCopiedIndex(idx);
+      setTimeout(() => setCopiedIndex(null), 1200);
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center">
@@ -311,10 +593,7 @@ const MyFlights = () => {
             {/* Seu Impacto Green Sky */}
             <Card className="bg-white border-0 shadow-lg flex flex-col h-full">
               <CardHeader>
-                <CardTitle className="font-heading text-xl text-gray-900 flex items-center">
-                  <span className="mr-2">🌱</span>
-                  Seu Impacto
-                </CardTitle>
+                <CardTitle className="font-heading text-xl text-gray-900">Seu Impacto</CardTitle>
               </CardHeader>
               <CardContent className="flex-1 flex flex-col justify-center">
                 <div className="flex flex-col gap-6 items-center text-center">
@@ -439,50 +718,6 @@ const MyFlights = () => {
     );
   }
 
-  const miles = contacts.filter(c => c.realized).length * 250;
-  const treesPlanted = Math.floor(miles / 250);
-  const co2Compensated = treesPlanted * 150;
-
-  // Função para feedback dos botões de milhas
-  const handleMilesAction = (action: string) => {
-    window.alert(`${action} em desenvolvimento!`);
-  };
-
-  // Função para exportar clientes como CSV
-  function exportClientesCSV(clientes: { name: string; email: string }[]) {
-    if (!clientes.length) return;
-    const header = 'Nome,Email\n';
-    const rows = clientes.map(c => `"${c.name}","${c.email}"`).join('\n');
-    const csvContent = header + rows;
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', 'clientes.csv');
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  }
-
-  // Função para copiar texto para a área de transferência
-  function copyToClipboard(text: string, idx?: number) {
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(text);
-    } else {
-      // Fallback para navegadores antigos
-      const textarea = document.createElement('textarea');
-      textarea.value = text;
-      document.body.appendChild(textarea);
-      textarea.select();
-      document.execCommand('copy');
-      document.body.removeChild(textarea);
-    }
-    if (typeof idx === 'number') {
-      setCopiedIndex(idx);
-      setTimeout(() => setCopiedIndex(null), 1200);
-    }
-  }
-
   return (
     <div className="min-h-screen bg-gradient-hero">
       <Header />
@@ -602,57 +837,79 @@ const MyFlights = () => {
               </div>
             </CardContent>
           </Card>
-          {/* Indique e Ganhe */}
+          {/* Meus Cupons */}
           <Card className="bg-white border-0 shadow-lg flex flex-col h-full">
             <CardHeader>
               <CardTitle className="font-heading text-xl text-gray-900 flex items-center">
-                <span className="mr-2">🤝</span>
-                Indique e Ganhe
+                <span className="mr-2">🎫</span>
+                Meus Cupons
               </CardTitle>
             </CardHeader>
             <CardContent className="flex-1 flex flex-col justify-center">
-              <div className="text-center mb-6">
-                <div className="bg-gradient-hero rounded-lg p-6 mb-4">
-                  <div className="text-3xl mb-2">🎉</div>
-                  <div className="font-bold text-xl text-gray-900 mb-1">
-                    Ganhe 200 milhas
-                  </div>
-                  <div className="text-gray-600">
-                    Para cada amigo que fizer seu primeiro voo
-                  </div>
+              {loadingCoupons ? (
+                <div className="text-center p-6">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-greensky-600 mx-auto mb-2"></div>
+                  <p className="text-gray-600">Carregando seus cupons...</p>
                 </div>
-              </div>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Seu link de indicação:
-                  </label>
-                  <div className="flex gap-2">
-                    <input 
-                      value={profile && profile.referralLink ? profile.referralLink : 'https://greensky.com/ref/user123'}
-                      readOnly 
-                      className="flex-1 bg-gray-50 border rounded px-2 py-1"
-                    />
-                    <Button 
-                      onClick={() => {navigator.clipboard.writeText(profile && profile.referralLink ? profile.referralLink : 'https://greensky.com/ref/user123')}}
-                      className="bg-gradient-primary"
-                    >
-                      Copiar
-                    </Button>
-                  </div>
+              ) : coupons.length > 0 ? (
+                <div className="space-y-4">
+                  {coupons.map((coupon) => {
+                    const status = getCouponStatus(coupon);
+                    return (
+                      <div key={coupon.id} className="bg-gradient-to-r from-gray-50 to-blue-50 rounded-lg p-4 border border-gray-200">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <div className="font-bold text-blue-600">
+                              {coupon.type === 'dual_flight' ? '1 Voo Duplo' : 'Cupom'}
+                            </div>
+                            <div className="text-sm text-gray-600 mb-1">
+                              Nº: {coupon.couponNumber}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              Criado em: {formatDate(coupon.createdAt)}
+                            </div>
+                            {coupon.expiresAt && (
+                              <div className="text-xs text-gray-500">
+                                Válido até: {formatDate(coupon.expiresAt)}
+                              </div>
+                            )}
+                          </div>
+                          <div className={`text-xs font-medium px-2 py-1 rounded-full ${status.className}`}>
+                            {status.text}
+                          </div>
+                        </div>
+                        {!coupon.used && status.text === 'Ativo' && (
+                          <div className="mt-2 pt-2 border-t border-gray-100">
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              className="w-full text-sm"
+                              onClick={() => {
+                                navigator.clipboard.writeText(coupon.couponNumber);
+                                window.alert(`Código do cupom copiado: ${coupon.couponNumber}`);
+                              }}
+                            >
+                              Copiar Código
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
-                <div className="text-center pt-4">
-                  <p className="text-sm text-gray-600 mb-4">
-                    Convide amigos e ganhe mais milhas! 🚀
-                  </p>
+              ) : (
+                <div className="text-center p-6 bg-gray-50 rounded-lg">
+                  <div className="text-4xl mb-2">🎁</div>
+                  <div className="font-medium text-gray-700 mb-2">Nenhum cupom disponível</div>
+                  <p className="text-sm text-gray-500 mb-4">Converta suas milhas em voos ou descontos especiais</p>
                   <Button 
-                    className="bg-gradient-sunset"
-                    onClick={() => window.alert('Compartilhamento em desenvolvimento!')}
+                    onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+                    className="bg-gradient-primary text-white"
                   >
-                    Compartilhar nas Redes
+                    Ver opções de conversão
                   </Button>
                 </div>
-              </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -788,8 +1045,12 @@ const MyFlights = () => {
               <div className="bg-blue-50 rounded-xl p-4 flex items-center gap-4">
                 <div className="text-3xl">✈️</div>
                 <div className="flex-1">
-                  <div className="font-bold text-blue-600 text-lg">250 Milhas</div>
-                  <div className="text-blue-500 text-sm">Adicionadas à sua conta</div>
+                  <div className="font-bold text-blue-600">
+                    250 Milhas
+                  </div>
+                  <div className="text-blue-500 text-sm">
+                    Adicionadas à sua conta
+                  </div>
                 </div>
               </div>
               
@@ -797,8 +1058,12 @@ const MyFlights = () => {
               <div className="bg-green-50 rounded-xl p-4 flex items-center gap-4">
                 <div className="text-3xl">🌳</div>
                 <div className="flex-1">
-                  <div className="font-bold text-green-600 text-lg">1 Árvore Plantada</div>
-                  <div className="text-green-500 text-sm">Contribuindo para o reflorestamento</div>
+                  <div className="font-bold text-green-600 text-lg">
+                    1 Árvore Plantada
+                  </div>
+                  <div className="text-green-500 text-sm">
+                    Contribuindo para o reflorestamento
+                  </div>
                 </div>
               </div>
               
@@ -806,8 +1071,12 @@ const MyFlights = () => {
               <div className="bg-emerald-50 rounded-xl p-4 flex items-center gap-4">
                 <div className="text-3xl">🌱</div>
                 <div className="flex-1">
-                  <div className="font-bold text-emerald-600 text-lg">300kg CO2 Compensado</div>
-                  <div className="text-emerald-500 text-sm">Reduzindo sua pegada de carbono</div>
+                  <div className="font-bold text-emerald-600 text-lg">
+                    300kg CO2 Compensado
+                  </div>
+                  <div className="text-emerald-500 text-sm">
+                    Reduzindo sua pegada de carbono
+                  </div>
                 </div>
               </div>
             </div>
