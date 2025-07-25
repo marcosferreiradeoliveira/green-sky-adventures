@@ -1,15 +1,23 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { auth, db } from "@/lib/firebase";
-import { collection, doc, getDoc, getDocs, onSnapshot, orderBy, query, updateDoc, where, getCountFromServer, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, onSnapshot, orderBy, query, updateDoc, where, getCountFromServer, serverTimestamp, limit, setDoc, deleteDoc } from 'firebase/firestore';
 import { useToast } from "@/components/ui/use-toast";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+
+// Type for the permission check result
+type PermissionResult = {
+  isAdmin: boolean;
+  userData?: any;
+  error?: string;
+  readError?: string;
+};
 import { AlertCircle, X, Phone, Mail, MapPin, Calendar, Clock, Info } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import Header from "@/components/Header";
@@ -21,26 +29,17 @@ const AdminDashboard = () => {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [metrics, setMetrics] = useState({
-    activePilots: 0,
-    activeUsers: 0,
-    confirmedFlights: 0,
-    couponsIssued: 0,
-    loading: true
-  });
-  
-  // Estado para armazenar a lista de pilotos
   const [pilots, setPilots] = useState<any[]>([]);
-  const [loadingPilots, setLoadingPilots] = useState(true);
-  
-  // Estado para armazenar a lista de usuários
   const [users, setUsers] = useState<any[]>([]);
-  const [loadingUsers, setLoadingUsers] = useState(true);
-  const [currentUsersPage, setCurrentUsersPage] = useState(1);
-  const [itemsPerPage] = useState(10);
-  
-  // Estados para paginação
+  const [metrics, setMetrics] = useState<any>({});
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [loadingPilots, setLoadingPilots] = useState(false);
+  const [loadingUsers, setLoadingUsers] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [currentUsersPage, setCurrentUsersPage] = useState(1);
+  const itemsPerPage = 10;
+
+  // Estado para armazenar a lista de pilotos
   
   // Estado para o modal de detalhes
   const [selectedPilot, setSelectedPilot] = useState<any>(null);
@@ -106,28 +105,7 @@ const AdminDashboard = () => {
   };
   
   // Verificar permissões do usuário
-  const checkUserPermissions = async () => {
-    if (!db) {
-      throw new Error('Firestore não está inicializado');
-    }
-    
-    if (!auth?.currentUser) {
-      throw new Error('Usuário não autenticado');
-    }
-    
-    // Verificar se o usuário é admin
-    const userDoc = await getDoc(doc(db, 'users', auth.currentUser.uid));
-    if (!userDoc.exists()) {
-      throw new Error('Usuário não encontrado no banco de dados');
-    }
-    
-    const userData = userDoc.data();
-    if (!userData?.admin) {
-      throw new Error('Acesso negado: permissão de administrador necessária');
-    }
-    
-    return true;
-  };
+  // Moved to the more comprehensive implementation below
   
   // Buscar lista de usuários com listener em tempo real
   const fetchUsers = () => {
@@ -176,45 +154,99 @@ const AdminDashboard = () => {
 
   // Buscar lista de pilotos com listener em tempo real
   const fetchPilots = () => {
+    console.log('fetchPilots chamado');
     setLoadingPilots(true);
     
     // Verificar se o usuário está autenticado
     if (!auth.currentUser) {
+      console.log('Usuário não autenticado');
       setLoadingPilots(false);
       return () => {}; // Retorna uma função vazia para unsubscribe
     }
     
-    // Criar a query para buscar os pilotos
-    const pilotsQuery = query(
-      collection(db, 'pilots'),
-      orderBy('createdAt', 'desc')
-    );
-    
-    // Configurar o listener em tempo real
-    const unsubscribe = onSnapshot(
-      pilotsQuery,
-      (querySnapshot) => {
-        const pilotsData = querySnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-        
-        setPilots(pilotsData);
-        setLoadingPilots(false);
-      },
-      (error) => {
-        setLoadingPilots(false);
-        
-        toast({
-          title: 'Erro ao carregar pilotos',
-          description: 'Não foi possível carregar a lista de pilotos.',
-          variant: 'destructive',
-        });
+    try {
+      // Verificar se o Firestore está inicializado
+      if (!db) {
+        console.error('Firestore não está inicializado');
+        throw new Error('O banco de dados não está disponível');
       }
-    );
-    
-    // Retornar a função de unsubscribe para limpar o listener
-    return unsubscribe;
+      
+      // Criar a query para buscar os pilotos
+      const pilotsQuery = query(
+        collection(db, 'pilots'),
+        orderBy('createdAt', 'desc')
+      );
+      
+      console.log('Query criada:', pilotsQuery);
+      
+      // Configurar o listener em tempo real
+      const unsubscribe = onSnapshot(
+        pilotsQuery,
+        (querySnapshot) => {
+          try {
+            console.log('Snapshot recebido, documentos:', querySnapshot.docs.length);
+            
+            if (!querySnapshot || !querySnapshot.docs) {
+              console.error('Dados de pilotos inválidos recebidos:', querySnapshot);
+              throw new Error('Dados recebidos são inválidos');
+            }
+            
+            const pilotsData = querySnapshot.docs.map(doc => {
+              if (!doc.exists) {
+                console.warn('Documento não existe:', doc.id);
+                return null;
+              }
+              
+              const data = doc.data();
+              console.log('Documento processado:', doc.id, data);
+              
+              return {
+                id: doc.id,
+                ...data
+              };
+            }).filter(Boolean); // Remove quaisquer entradas nulas
+            
+            console.log(`${pilotsData.length} pilotos processados com sucesso`);
+            setPilots(pilotsData);
+          } catch (processingError) {
+            console.error('Erro ao processar dados dos pilotos:', processingError);
+            toast({
+              title: 'Erro de processamento',
+              description: 'Ocorreu um erro ao processar os dados dos pilotos.',
+              variant: 'destructive',
+            });
+          } finally {
+            setLoadingPilots(false);
+          }
+        },
+        (error) => {
+          console.error('Erro no listener de pilotos:', error);
+          setLoadingPilots(false);
+          
+          toast({
+            title: 'Erro ao carregar pilotos',
+            description: error.message || 'Não foi possível carregar a lista de pilotos.',
+            variant: 'destructive',
+          });
+        }
+      );
+      
+      console.log('Listener configurado, retornando unsubscribe');
+      return unsubscribe;
+      
+    } catch (error) {
+      console.error('Erro ao configurar listener de pilotos:', error);
+      setLoadingPilots(false);
+      
+      toast({
+        title: 'Erro',
+        description: error.message || 'Não foi possível configurar a busca por pilotos.',
+        variant: 'destructive',
+      });
+      
+      // Retorna uma função vazia para manter a assinatura consistente
+      return () => {};
+    }
   };
 
   // Buscar métricas do dashboard
@@ -253,38 +285,248 @@ const AdminDashboard = () => {
     }
   };
   
+  // Função para testar a conexão com o Firestore e buscar pilotos diretamente
+  const testFirestoreConnection = async () => {
+    try {
+      console.log('Testando conexão com o Firestore...');
+      
+      // Testar conexão básica
+      console.log('Testando conexão básica com o Firestore...');
+      const testDocRef = doc(db, 'test', 'connection');
+      const testDoc = await getDoc(testDocRef);
+      console.log('Conexão com Firestore bem-sucedida');
+      
+      // Testar busca direta por pilotos
+      console.log('Testando busca direta por pilotos...');
+      try {
+        const pilotsQuery = query(collection(db, 'pilots'), limit(5));
+        const querySnapshot = await getDocs(pilotsQuery);
+        
+        console.log(`Encontrados ${querySnapshot.size} pilotos na busca direta`);
+        
+        if (querySnapshot.size === 0) {
+          console.warn('Nenhum piloto encontrado na coleção "pilots"');
+          
+          // Verificar se a coleção existe tentando adicionar um documento de teste
+          console.log('Verificando permissões de escrita...');
+          const testPilotRef = doc(collection(db, 'pilots'));
+          try {
+            await setDoc(testPilotRef, {
+              test: true,
+              timestamp: serverTimestamp()
+            });
+            console.log('Permissão de escrita confirmada para a coleção "pilots"');
+            
+            // Remover o documento de teste
+            await deleteDoc(testPilotRef);
+          } catch (writeError) {
+            console.error('Erro ao tentar escrever na coleção "pilots":', writeError);
+          }
+        } else {
+          querySnapshot.forEach((doc) => {
+            console.log('Piloto direto:', {
+              id: doc.id,
+              data: doc.data(),
+              hasUid: !!doc.data().uid,
+              hasPilotId: !!doc.data().pilotId
+            });
+          });
+        }
+      } catch (pilotsError) {
+        console.error('Erro ao buscar pilotos:', pilotsError);
+        
+        // Tentar buscar a coleção de usuários para verificar permissões
+        try {
+          console.log('Testando acesso à coleção "users"...');
+          const usersQuery = query(collection(db, 'users'), limit(1));
+          const usersSnapshot = await getDocs(usersQuery);
+          console.log(`Acesso à coleção "users" bem-sucedido, ${usersSnapshot.size} usuários encontrados`);
+        } catch (usersError) {
+          console.error('Erro ao acessar coleção "users":', usersError);
+        }
+        
+        throw pilotsError; // Relançar o erro para ser tratado no catch externo
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('Erro ao conectar ao Firestore ou buscar pilotos:', error);
+      
+      // Verificar se é um erro de permissão
+      if (error.code === 'permission-denied') {
+        console.error('Permissão negada para acessar o Firestore');
+        toast({
+          title: 'Permissão negada',
+          description: 'Você não tem permissão para acessar os dados. Verifique se está autenticado como administrador.',
+          variant: 'destructive',
+        });
+      } else {
+        // Mostrar erro genérico para outros tipos de erro
+        toast({
+          title: 'Erro de conexão',
+          description: `Não foi possível conectar ao banco de dados: ${error.message}`,
+          variant: 'destructive',
+        });
+      }
+      
+      return false;
+    }
+  };
+
+  // Verificar permissões do usuário no Firestore
+  const checkUserPermissions = useCallback(async (userId: string): Promise<PermissionResult> => {
+    try {
+      console.log('Verificando permissões do usuário:', userId);
+      
+      // 1. Verificar se o documento do usuário existe
+      const userDoc = await getDoc(doc(db, 'users', userId));
+      console.log('Documento do usuário encontrado:', userDoc.exists());
+      
+      if (!userDoc.exists()) {
+        console.error('Documento do usuário não encontrado no Firestore');
+        return { isAdmin: false, error: 'Usuário não encontrado' };
+      }
+      
+      const userData = userDoc.data();
+      console.log('Dados do usuário:', userData);
+      
+      // 2. Verificar se o usuário é admin
+      const isAdmin = !!(userData?.admin);
+      console.log('Usuário é admin?', isAdmin);
+      
+      // 3. Verificar permissões de leitura/escrita
+      try {
+        console.log('Testando leitura da coleção de usuários...');
+        const testQuery = query(collection(db, 'users'), limit(1));
+        const testSnapshot = await getDocs(testQuery);
+        console.log('Leitura de usuários bem-sucedida, documentos encontrados:', testSnapshot.size);
+      } catch (readError) {
+        console.error('Erro ao ler dados do Firestore:', readError);
+        return { isAdmin, readError: (readError as Error).message };
+      }
+      
+      return { isAdmin, userData };
+      
+    } catch (error) {
+      console.error('Erro ao verificar permissões:', error);
+      return { isAdmin: false, error: (error as Error).message };
+    }
+  }, []);
+
   // Efeito para gerenciar autenticação e carregamento inicial
   useEffect(() => {
+    console.log('useEffect de autenticação iniciado');
     let unsubPilots: (() => void) | undefined;
     let unsubUsers: (() => void) | undefined;
+    let mounted = true;
     
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      if (currentUser) {
-        setUser(currentUser);
+    const initializeAdminDashboard = async (currentUser: User) => {
+      if (!mounted) return;
+      
+      console.log('Usuário autenticado, verificando permissões...');
+      setUser(currentUser);
+      
+      try {
+        // Verificar permissões do usuário
+        const permissionResult = await checkUserPermissions(currentUser.uid);
         
-        // Verificar se o usuário é admin
-        const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
-        if (userDoc.exists() && userDoc.data()?.admin) {
-          setProfile(userDoc.data());
-          await fetchMetrics();
-          unsubPilots = fetchPilots();
-          unsubUsers = fetchUsers();
-          setLoading(false);
-        } else {
-          // Redirecionar se não for admin
+        if (permissionResult.error || permissionResult.readError) {
+          console.error('Erro nas permissões do usuário:', permissionResult.error || permissionResult.readError);
+          toast({
+            title: 'Erro de permissão',
+            description: 'Não foi possível verificar suas permissões de administrador. Por favor, tente novamente mais tarde.',
+            variant: 'destructive',
+          });
           navigate('/');
+          return;
         }
+        
+        if (!permissionResult.isAdmin) {
+          console.log('Usuário não é administrador, redirecionando...');
+          toast({
+            title: 'Acesso negado',
+            description: 'Você precisa ser um administrador para acessar esta página.',
+            variant: 'destructive',
+          });
+          navigate('/');
+          return;
+        }
+        
+        // Se chegou aqui, o usuário é admin e tem permissões
+        console.log('Usuário é administrador, carregando dados...');
+        setProfile(permissionResult.userData);
+        
+        try {
+          // Testar conexão com Firestore
+          console.log('Testando conexão com o Firestore...');
+          const isConnected = await testFirestoreConnection();
+          
+          if (!mounted) return;
+          
+          if (!isConnected) {
+            throw new Error('Falha na conexão com o banco de dados');
+          }
+          
+          console.log('Conexão com Firestore bem-sucedida, carregando dados...');
+          
+          // Carregar métricas e dados
+          console.log('Chamando fetchMetrics...');
+          await fetchMetrics();
+          
+          if (!mounted) return;
+          
+          console.log('fetchMetrics concluído, chamando fetchPilots...');
+          unsubPilots = fetchPilots();
+          
+          console.log('fetchPilots chamado, chamando fetchUsers...');
+          unsubUsers = fetchUsers();
+          
+          console.log('Todos os dados foram solicitados');
+          setLoading(false);
+          
+        } catch (error) {
+          console.error('Erro ao carregar dados:', error);
+          if (mounted) {
+            setLoading(false);
+            toast({
+              title: 'Erro ao carregar dados',
+              description: error.message || 'Não foi possível carregar os dados do painel.',
+              variant: 'destructive',
+            });
+          }
+        }
+        
+      } catch (error) {
+        console.error('Erro ao verificar permissões de administrador:', error);
+        if (mounted) {
+          setLoading(false);
+          toast({
+            title: 'Erro',
+            description: 'Ocorreu um erro ao verificar suas permissões.',
+            variant: 'destructive',
+          });
+        }
+      }
+    };
+    
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      console.log('onAuthStateChanged chamado, usuário:', currentUser ? 'autenticado' : 'não autenticado');
+      
+      if (currentUser) {
+        initializeAdminDashboard(currentUser);
       } else {
-        // Redirecionar para login se não estiver autenticado
+        console.log('Nenhum usuário autenticado, redirecionando para login...');
         navigate('/login');
       }
     });
 
     // Função de limpeza
     return () => {
-      unsubscribe();
+      console.log('Limpando listeners...');
       if (unsubPilots) unsubPilots();
       if (unsubUsers) unsubUsers();
+      unsubscribe();
+      mounted = false;
     };
   }, [navigate]);
   
