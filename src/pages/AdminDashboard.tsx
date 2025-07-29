@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -34,6 +34,7 @@ interface User {
   lastName: string;
   photo: string;
   state: string;
+  createdAt?: any;
 }
 
 interface Pilot {
@@ -101,42 +102,93 @@ const AdminDashboard = () => {
     expiredCoupons: 0
   });
 
-  // Busca usuários com atualização em tempo real
-  const fetchUsers = () => {
+  // Memoize fetchPilots with useCallback
+  const fetchPilots = useCallback(() => {
+    setLoading(true);
+    const q = collection(db, 'pilots');
+    
+    const unsubscribe = onSnapshot(q, 
+      (snapshot) => {
+        const pilotsData = snapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            uid: data.uid || '',
+            name: data.name || '',
+            city: data.city || '',
+            state: data.state || '',
+            description: data.description || '',
+            experience: data.experience || '',
+            location: data.location || '',
+            photo: data.photo || '',
+            price: data.price || '',
+            rating: data.rating || 0,
+            school: data.school || '',
+            type: data.type || '',
+            whatsapp: data.whatsapp || '',
+            status: data.status || 'pending',
+            contacts: data.contacts || [],
+            demoPhotos: data.demoPhotos || []
+          } as Pilot;
+        });
+        
+        setPilots(pilotsData);
+        setLoading(false);
+      }, 
+      (error) => {
+        console.error('Error fetching pilots:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to load pilots data',
+          variant: 'destructive',
+        });
+        setLoading(false);
+      }
+    );
+    
+    return unsubscribe;
+  }, [toast]);
+
+  // Memoize fetchUsers with useCallback
+  const fetchUsers = useCallback(() => {
     setLoading(true);
     const q = collection(db, 'users');
     
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const usersData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        admin: doc.data().admin || false,
-        city: doc.data().city || '',
-        contacts: doc.data().contacts || [],
-        country: doc.data().country || '',
-        email: doc.data().email || '',
-        firstName: doc.data().firstName || '',
-        lastName: doc.data().lastName || '',
-        photo: doc.data().photo || '',
-        state: doc.data().state || ''
-      } as User));
-      
-      setUsers(usersData);
-      setLoading(false);
-    }, (error) => {
-      console.error('Error fetching users:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load users data',
-        variant: 'destructive',
-      });
-      setLoading(false);
-    });
+    const unsubscribe = onSnapshot(q, 
+      (snapshot) => {
+        const usersData = snapshot.docs.map(doc => ({
+          id: doc.id,
+          admin: doc.data().admin || false,
+          city: doc.data().city || '',
+          contacts: doc.data().contacts || [],
+          country: doc.data().country || '',
+          email: doc.data().email || '',
+          firstName: doc.data().firstName || '',
+          lastName: doc.data().lastName || '',
+          photo: doc.data().photo || '',
+          state: doc.data().state || '',
+          createdAt: doc.data().createdAt
+        } as User));
+        
+        setUsers(usersData);
+        setLoading(false);
+      }, 
+      (error) => {
+        console.error('Error fetching users:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to load users data',
+          variant: 'destructive',
+        });
+        setLoading(false);
+      }
+    );
     
     return unsubscribe;
-  };
+  }, [toast]);
 
   // Busca contatos com atualização em tempo real
-  const fetchContacts = () => {
+  const fetchContacts = useCallback(() => {
     setLoading(true);
     const q = query(collection(db, 'contacts'), orderBy('timestamp', 'desc'));
     
@@ -165,55 +217,10 @@ const AdminDashboard = () => {
     });
     
     return unsubscribe;
-  };
-
-  // Busca pilotos com atualização em tempo real
-  const fetchPilots = () => {
-    setLoading(true);
-    const q = collection(db, 'pilots');
-    
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const pilotsData = snapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          uid: data.uid || '',
-          name: data.name || '',
-          city: data.city || '',
-          state: data.state || '',
-          description: data.description || '',
-          experience: data.experience || '',
-          location: data.location || '',
-          photo: data.photo || '',
-          price: data.price || '',
-          rating: data.rating || 0,
-          school: data.school || '',
-          type: data.type || '',
-          whatsapp: data.whatsapp || '',
-          status: data.status || 'pending',
-          contacts: data.contacts || [],
-          demoPhotos: data.demoPhotos || []
-        } as Pilot;
-      });
-      
-      setPilots(pilotsData);
-      setLoading(false);
-    }, (error) => {
-      console.error('Error fetching pilots:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load pilots data',
-        variant: 'destructive',
-      });
-      setLoading(false);
-    });
-    
-    // Return the unsubscribe function to clean up the listener
-    return unsubscribe;
-  };
+  }, [toast]);
 
   // Fetch coupons with real-time updates
-  const fetchCoupons = () => {
+  const fetchCoupons = useCallback(() => {
     setLoadingCoupons(true);
     const q = query(collection(db, 'coupons'), orderBy('createdAt', 'desc'));
     
@@ -239,7 +246,7 @@ const AdminDashboard = () => {
     });
     
     return unsubscribe;
-  };
+  }, [toast]);
 
   // Handle pilot status change
   const handleStatusChange = async (pilotId: string, newStatus: 'approved' | 'rejected') => {
@@ -292,63 +299,62 @@ const AdminDashboard = () => {
     }
   };
 
-  // Check authentication and set up real-time listeners
+  // Update the main useEffect with proper cleanup
   useEffect(() => {
+    let isMounted = true;
+    const unsubscribes: (() => void)[] = [];
+
     const authUnsubscribe = onAuthStateChanged(auth, (user) => {
       if (!user) {
         navigate('/login');
-      } else {
-        // Set up the real-time listeners for pilots, users, and contacts
+      } else if (isMounted) {
+        // Set up the real-time listeners
         const pilotsUnsubscribe = fetchPilots();
         const usersUnsubscribe = fetchUsers();
         const contactsUnsubscribe = fetchContacts();
         const couponsUnsubscribe = fetchCoupons();
         
-        // Clean up the listeners when component unmounts or auth changes
-        return () => {
-          if (pilotsUnsubscribe) pilotsUnsubscribe();
-          if (usersUnsubscribe) usersUnsubscribe();
-          if (contactsUnsubscribe) contactsUnsubscribe();
-          if (couponsUnsubscribe) couponsUnsubscribe();
-        };
+        if (pilotsUnsubscribe) unsubscribes.push(pilotsUnsubscribe);
+        if (usersUnsubscribe) unsubscribes.push(usersUnsubscribe);
+        if (contactsUnsubscribe) unsubscribes.push(contactsUnsubscribe);
+        if (couponsUnsubscribe) unsubscribes.push(couponsUnsubscribe);
       }
     });
 
-    // Clean up the auth listener when component unmounts
     return () => {
+      isMounted = false;
       authUnsubscribe();
+      // Clean up all subscriptions
+      unsubscribes.forEach(unsubscribe => {
+        if (unsubscribe && typeof unsubscribe === 'function') {
+          unsubscribe();
+        }
+      });
     };
-  }, [navigate]);
+  }, [navigate, toast, fetchPilots, fetchUsers, fetchContacts, fetchCoupons]);
 
+  // Update other useEffects to include proper dependencies
   useEffect(() => {
     if (pilots.length > 0 || users.length > 0 || contacts.length > 0 || coupons.length > 0) {
       const currentDate = new Date();
       const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
       
-      // Helper function to safely convert Firestore timestamps
       const toDate = (timestamp: any) => {
         if (!timestamp) return null;
         return timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
       };
       
-      const newStats = {
-        // Pilots
+      setStats({
         totalPilots: pilots.length,
         activePilots: pilots.filter(p => p.status === 'approved').length,
         pendingPilots: pilots.filter(p => p.status === 'pending').length,
-        
-        // Users
         totalUsers: users.length,
         newUsersThisMonth: users.filter(u => {
           const userDate = toDate(u.createdAt);
           return userDate && userDate >= firstDayOfMonth;
         }).length,
-        
-        // Contacts
         totalContacts: contacts.length,
         realizedContacts: contacts.filter(c => c.realized).length,
-        
-        // Coupons
         totalCoupons: coupons.length,
         usedCoupons: coupons.filter(c => c.used).length,
         activeCoupons: coupons.filter(c => {
@@ -359,10 +365,7 @@ const AdminDashboard = () => {
           const expiresAt = toDate(c.expiresAt);
           return expiresAt && expiresAt < currentDate;
         }).length
-      };
-      
-      setStats(newStats);
-    
+      });
     }
   }, [pilots, users, contacts, coupons]);
 
@@ -373,12 +376,16 @@ const AdminDashboard = () => {
   const totalPages = Math.ceil(pilots.length / itemsPerPage);
 
   // Format date helper function
-  const formatDate = (date: Date | null | undefined) => {
+  const formatDate = (date: Date | { toDate: () => Date } | null | undefined) => {
     if (!date) return 'N/A';
     
     try {
       // If it's a Firestore timestamp, convert it to a Date
-      const dateObj = typeof date === 'object' && 'toDate' in date ? date.toDate() : new Date(date);
+      const dateObj = date instanceof Date 
+        ? date 
+        : typeof date === 'object' && date !== null && 'toDate' in date 
+          ? date.toDate() 
+          : new Date(date as any);
       
       if (isNaN(dateObj.getTime())) return 'Data inválida';
       
@@ -743,7 +750,16 @@ const AdminDashboard = () => {
               <CardHeader>
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                   <div>
-                    <CardTitle>Gerenciar Pilotos</CardTitle>
+                    <div className="flex items-center gap-4">
+                      <CardTitle>Gerenciar Pilotos</CardTitle>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => navigate('/add-pilot')}
+                      >
+                        Criar Piloto
+                      </Button>
+                    </div>
                     <p className="text-sm text-gray-500 mt-1">
                       {pilots.length} pilotos cadastrados
                     </p>
