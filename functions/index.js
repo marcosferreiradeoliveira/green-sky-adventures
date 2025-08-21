@@ -5,7 +5,7 @@ import nodemailer from 'nodemailer';
 import express from 'express';
 
 // Initialize Firebase Admin
-initializeApp();
+const admin = initializeApp();
 
 // Create reusable transporter object using Gmail SMTP
 const transporter = nodemailer.createTransport({
@@ -16,7 +16,7 @@ const transporter = nodemailer.createTransport({
   }
 });
 
-// Create Express app for health checks
+// Create Express app
 const app = express();
 
 // Health check endpoint
@@ -36,120 +36,87 @@ export const sendGiftEmail = onCall(
   async (request) => {
     const { data, auth } = request;
     
-    console.log('Recebida requisição para enviar email:', { 
-      auth: auth,
-      data: { 
-        to: data.to,
-        friendName: data.friendName ? 'Fornecido' : 'Não fornecido',
-        couponCode: data.couponCode ? 'Fornecido' : 'Não fornecido',
-        senderName: data.senderName ? 'Fornecido' : 'Não fornecido',
-        message: data.message ? 'Fornecido' : 'Não fornecido'
-      }
-    });
+    if (!auth) {
+      throw new HttpsError(
+        'unauthenticated',
+        'Você precisa estar autenticado para enviar um presente.'
+      );
+    }
 
-    // Check if the request is authenticated
-    // if (!auth) {
-    //   console.error('Usuário não autenticado');
-    //   throw new HttpsError(
-    //     'unauthenticated',
-    //     'Você precisa estar logado para enviar um presente.'
-    //   );
-    // }
+    if (!data || !data.to || !data.couponCode) {
+      throw new HttpsError(
+        'invalid-argument',
+        'E-mail do amigo e código do cupom são obrigatórios.'
+      );
+    }
 
-    const { to, friendName, couponCode, senderName, message } = data;
+    const { to, friendName = 'Amigo(a)', couponCode, senderName, message = '' } = data;
+    const user = auth.uid ? await getAuth().getUser(auth.uid) : null;
 
-    // // Validate required fields
-    // if (!to || !couponCode) {
-    //   const errorMsg = 'E-mail do destinatário e código do cupom são obrigatórios.';
-    //   console.error(errorMsg, { to, couponCode });
-    //   throw new HttpsError(
-    //     'invalid-argument',
-    //     errorMsg
-    //   );
-    // }
+    const emailText = `Olá ${friendName},\n\n` +
+      `${senderName || 'Alguém'} te enviou um presente especial!\n\n` +
+      `Mensagem: ${message || 'Um presente especial para você!'}\n\n` +
+      `Código do cupom: ${couponCode}\n\n` +
+      'Aproveite seu presente!\n' +
+      'Atenciosamente,\nEquipe Green Sky';
+
+    const mailOptions = {
+      from: `"Green Sky" <${process.env.GMAIL_EMAIL}>`,
+      to: to,
+      subject: 'Você recebeu um presente especial!',
+      text: emailText,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2>Olá ${friendName},</h2>
+          <p>${senderName || 'Alguém'} te enviou um presente especial!</p>
+          <p>Mensagem: ${message || 'Um presente especial para você!'}</p>
+          <div style="background-color: #f0f0f0; padding: 15px; margin: 20px 0; text-align: center;">
+            <p style="font-size: 1.2em; font-weight: bold;">Código do cupom:</p>
+            <p style="font-size: 1.5em; letter-spacing: 2px; color: #2e7d32;">${couponCode}</p>
+          </div>
+          <p>Aproveite seu presente!</p>
+          <p>Atenciosamente,<br>Equipe Green Sky</p>
+        </div>
+      `
+    };
 
     try {
-      // Email options
-      const mailOptions = {
-        from: `"Green Sky Adventures" <${process.env.GMAIL_EMAIL}>`,
-        to: to,
-        subject: `${senderName || 'Alguém'} te enviou um voo duplo de presente!`,
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h1>Parabéns, ${friendName || 'Amigo(a)'}!</h1>
-            <p>${senderName || 'Um amigo'} te enviou um voo duplo de presente na Green Sky Adventures!</p>
-            
-            ${message ? `<blockquote style="background: #f9f9f9; border-left: 10px solid #ccc; margin: 1.5em 10px; padding: 0.5em 10px;">
-              <p>${message}</p>
-            </blockquote>` : ''}
-            
-            <div style="background: #f0f8ff; padding: 20px; border-radius: 5px; margin: 20px 0; text-align: center;">
-              <h2>Seu Código de Cupom</h2>
-              <div style="font-size: 24px; font-weight: bold; letter-spacing: 2px; margin: 15px 0;">${couponCode}</div>
-              <p>Validade: 6 meses a partir de hoje</p>
-            </div>
-            
-            <p>Para resgatar seu voo, acesse:</p>
-            <a href="https://greenskyadventures.com.br/resgatar?code=${encodeURIComponent(couponCode)}" 
-              style="display: inline-block; background: #0066cc; color: white; padding: 10px 20px; 
-                    text-decoration: none; border-radius: 5px; margin: 10px 0;">
-              Resgatar Meu Voo Duplo
-            </a>
-            
-            <p style="margin-top: 30px; font-size: 12px; color: #666;">
-              Este é um e-mail automático, por favor não responda. Se precisar de ajuda, entre em contato com nosso suporte.
-            </p>
-          </div>
-        `
-      };
-
-      // Send email
-      const info = await transporter.sendMail(mailOptions);
-      console.log('Email enviado com sucesso:', info.messageId);
-      
-      // Log the email sending
-      const logEntry = {
-        to,
-        template: 'gift-flight',
-        couponCode,
-        sentAt: initializeApp().firestore.FieldValue.serverTimestamp(),
-        status: 'sent',
-        provider: 'gmail-smtp',
-        messageId: info.messageId,
-        senderId: auth.uid
-      };
-      
-      await initializeApp().firestore().collection('emailLogs').add(logEntry);
-      
-      return { success: true, message: 'E-mail enviado com sucesso!', messageId: info.messageId };
-      
+      await transporter.sendMail(mailOptions);
+      console.log(`E-mail enviado para ${to}`);
+      return { success: true, message: 'E-mail enviado com sucesso!' };
     } catch (error) {
-      console.error('Erro na função sendGiftEmail:', error);
-      
-      // Log the error
-      await initializeApp().firestore().collection('emailLogs').add({
-        to: data.to,
-        template: 'gift-flight',
-        couponCode: data.couponCode,
-        error: error.toString(),
-        sentAt: initializeApp().firestore.FieldValue.serverTimestamp(),
-        status: 'failed',
-        provider: 'gmail-smtp',
-        senderId: auth?.uid
-      });
-
-      if (error instanceof HttpsError) {
-        throw error;
-      }
-      
+      console.error('Erro ao enviar e-mail:', error);
       throw new HttpsError(
         'internal',
-        'Ocorreu um erro inesperado ao processar sua solicitação.',
-        { error: error.message }
+        'Ocorreu um erro ao enviar o e-mail. Por favor, tente novamente mais tarde.'
       );
     }
   }
 );
 
+// Only start the server if this is running locally (not in Cloud Functions environment)
+if (process.env.FUNCTIONS_EMULATOR) {
+  const PORT = process.env.PORT || 8080;
+  const server = app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+
+  // Handle shutdown gracefully
+  process.on('SIGTERM', () => {
+    console.log('SIGTERM signal received: closing HTTP server');
+    server.close(() => {
+      console.log('HTTP server closed');
+    });
+  });
+}
+
 // Export the Express app for Cloud Run
-export const api = onRequest({ region: 'us-central1' }, app);
+export const api = onRequest({
+  region: 'us-central1',
+  minInstances: 0,
+  maxInstances: 10,
+  memory: '256MB',
+  timeoutSeconds: 60,
+  concurrency: 80,
+  cpu: 1
+}, app);
