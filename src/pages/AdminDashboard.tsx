@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -76,6 +76,10 @@ const AdminDashboard = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   
+  // Refs para cleanup
+  const isMountedRef = useRef(true);
+  const isAuthenticatedRef = useRef(false);
+  
   // State
   const [loading, setLoading] = useState(true);
   const [users, setUsers] = useState<User[]>([]);
@@ -102,159 +106,263 @@ const AdminDashboard = () => {
     expiredCoupons: 0
   });
 
-  // Memoize fetchPilots with useCallback
-  const fetchPilots = useCallback(() => {
-    setLoading(true);
-    const q = collection(db, 'pilots');
-    
-    const unsubscribe = onSnapshot(q, 
-      (snapshot) => {
-        const pilotsData = snapshot.docs.map(doc => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            uid: data.uid || '',
-            name: data.name || '',
-            city: data.city || '',
-            state: data.state || '',
-            description: data.description || '',
-            experience: data.experience || '',
-            location: data.location || '',
-            photo: data.photo || '',
-            price: data.price || '',
-            rating: data.rating || 0,
-            school: data.school || '',
-            type: data.type || '',
-            whatsapp: data.whatsapp || '',
-            status: data.status || 'pending',
-            contacts: data.contacts || [],
-            demoPhotos: data.demoPhotos || []
-          } as Pilot;
-        });
-        
-        setPilots(pilotsData);
-        setLoading(false);
-      }, 
-      (error) => {
-        console.error('Error fetching pilots:', error);
-        toast({
-          title: 'Error',
-          description: 'Failed to load pilots data',
-          variant: 'destructive',
-        });
-        setLoading(false);
-      }
-    );
-    
-    return unsubscribe;
-  }, [toast]);
+  // Cleanup function
+  const cleanup = useCallback(() => {
+    // No more real-time listeners to clean up
+    // This function is kept for backward compatibility
+  }, []);
 
-  // Memoize fetchUsers with useCallback
+  // Helper para verificar se o componente ainda está montado
+  const safeSetState = useCallback((setter: () => void) => {
+    if (isMountedRef.current) {
+      try {
+        setter();
+      } catch (error) {
+        console.warn('Error setting state:', error);
+      }
+    }
+  }, []);
+
+  // Busca usuários com proteção contra loops infinitos
   const fetchUsers = useCallback(() => {
-    setLoading(true);
-    const q = collection(db, 'users');
+    if (!isAuthenticatedRef.current || !isMountedRef.current) return;
     
-    const unsubscribe = onSnapshot(q, 
-      (snapshot) => {
-        const usersData = snapshot.docs.map(doc => ({
-          id: doc.id,
-          admin: doc.data().admin || false,
-          city: doc.data().city || '',
-          contacts: doc.data().contacts || [],
-          country: doc.data().country || '',
-          email: doc.data().email || '',
-          firstName: doc.data().firstName || '',
-          lastName: doc.data().lastName || '',
-          photo: doc.data().photo || '',
-          state: doc.data().state || '',
-          createdAt: doc.data().createdAt
-        } as User));
-        
-        setUsers(usersData);
+    try {
+      const q = collection(db, 'users');
+      
+      const unsubscribe = onSnapshot(q, 
+        (snapshot) => {
+          if (!isMountedRef.current) return;
+          
+          const usersData = snapshot.docs.map(doc => ({
+            id: doc.id,
+            admin: doc.data().admin || false,
+            city: doc.data().city || '',
+            contacts: doc.data().contacts || [],
+            country: doc.data().country || '',
+            email: doc.data().email || '',
+            firstName: doc.data().firstName || '',
+            lastName: doc.data().lastName || '',
+            photo: doc.data().photo || '',
+            state: doc.data().state || '',
+            createdAt: doc.data().createdAt || null
+          } as User));
+          
+          safeSetState(() => {
+            setUsers(usersData);
+            setLoading(false);
+          });
+        }, 
+        (error) => {
+          console.error('Error fetching users:', error);
+          if (isMountedRef.current) {
+            toast({
+              title: 'Error',
+              description: 'Failed to load users data',
+              variant: 'destructive',
+            });
+            setLoading(false);
+          }
+        }
+      );
+      
+      // unsubscribersRef.current.push(unsubscribe);
+    } catch (error) {
+      console.error('Error setting up users listener:', error);
+    }
+  }, [safeSetState, toast]);
+
+  // Busca contatos com proteção contra loops infinitos
+  const fetchContacts = useCallback(() => {
+    if (!isAuthenticatedRef.current || !isMountedRef.current) return;
+    
+    try {
+      const q = query(collection(db, 'contacts'), orderBy('timestamp', 'desc'));
+      
+      const unsubscribe = onSnapshot(q, 
+        (snapshot) => {
+          if (!isMountedRef.current) return;
+          
+          const contactsData = snapshot.docs.map(doc => ({
+            id: doc.id,
+            confirmed: doc.data().confirmed || false,
+            pilotId: doc.data().pilotId || '',
+            rating: doc.data().rating || 0,
+            realized: doc.data().realized || false,
+            review: doc.data().review || '',
+            timestamp: doc.data().timestamp || null,
+            userId: doc.data().userId || ''
+          } as Contact));
+          
+          safeSetState(() => {
+            setContacts(contactsData);
+            setLoading(false);
+          });
+        }, 
+        (error) => {
+          console.error('Error fetching contacts:', error);
+          if (isMountedRef.current) {
+            toast({
+              title: 'Error',
+              description: 'Falha ao carregar contatos',
+              variant: 'destructive',
+            });
+            setLoading(false);
+          }
+        }
+      );
+      
+      // unsubscribersRef.current.push(unsubscribe);
+    } catch (error) {
+      console.error('Error setting up contacts listener:', error);
+    }
+  }, [safeSetState, toast]);
+
+  // Busca pilotos com proteção contra loops infinitos
+  const fetchPilots = useCallback(() => {
+    if (!isAuthenticatedRef.current || !isMountedRef.current) return;
+    
+    try {
+      const q = collection(db, 'pilots');
+      
+      const unsubscribe = onSnapshot(q, 
+        (snapshot) => {
+          if (!isMountedRef.current) return;
+          
+          const pilotsData = snapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+              id: doc.id,
+              uid: data.uid || '',
+              name: data.name || '',
+              city: data.city || '',
+              state: data.state || '',
+              description: data.description || '',
+              experience: data.experience || '',
+              location: data.location || '',
+              photo: data.photo || '',
+              price: data.price || '',
+              rating: data.rating || 0,
+              school: data.school || '',
+              type: data.type || '',
+              whatsapp: data.whatsapp || '',
+              status: data.status || 'pending',
+              contacts: data.contacts || [],
+              demoPhotos: data.demoPhotos || []
+            } as Pilot;
+          });
+          
+          safeSetState(() => {
+            setPilots(pilotsData);
+            setLoading(false);
+          });
+        }, 
+        (error) => {
+          console.error('Error fetching pilots:', error);
+          if (isMountedRef.current) {
+            toast({
+              title: 'Error',
+              description: 'Failed to load pilots data',
+              variant: 'destructive',
+            });
+            setLoading(false);
+          }
+        }
+      );
+      
+      // unsubscribersRef.current.push(unsubscribe);
+    } catch (error) {
+      console.error('Error setting up pilots listener:', error);
+    }
+  }, [safeSetState, toast]);
+
+  // Busca cupons com proteção contra loops infinitos
+  const fetchCoupons = useCallback(() => {
+    if (!isAuthenticatedRef.current || !isMountedRef.current) return;
+    
+    try {
+      const q = query(collection(db, 'coupons'), orderBy('createdAt', 'desc'));
+      
+      const unsubscribe = onSnapshot(q, 
+        (snapshot) => {
+          if (!isMountedRef.current) return;
+          
+          const couponsData = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            createdAt: doc.data().createdAt?.toDate(),
+            expiresAt: doc.data().expiresAt?.toDate(),
+            usedAt: doc.data().usedAt?.toDate() || null
+          } as Coupon));
+          
+          safeSetState(() => {
+            setCoupons(couponsData);
+            setLoadingCoupons(false);
+          });
+        }, 
+        (error) => {
+          console.error('Error fetching coupons:', error);
+          if (isMountedRef.current) {
+            toast({
+              title: 'Erro',
+              description: 'Falha ao carregar cupons',
+              variant: 'destructive',
+            });
+            setLoadingCoupons(false);
+          }
+        }
+      );
+      
+      // unsubscribersRef.current.push(unsubscribe);
+    } catch (error) {
+      console.error('Error setting up coupons listener:', error);
+    }
+  }, [safeSetState, toast]);
+
+  // Fetch all data once on initial load
+  const fetchAllData = useCallback(async () => {
+    if (!isAuthenticatedRef.current || !isMountedRef.current) return;
+    
+    try {
+      setLoading(true);
+      
+      // Fetch all data in parallel
+      await Promise.all([
+        fetchPilots(),
+        fetchUsers(),
+        fetchContacts(),
+        fetchCoupons()
+      ]);
+      
+      if (isMountedRef.current) {
         setLoading(false);
-      }, 
-      (error) => {
-        console.error('Error fetching users:', error);
+      }
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      if (isMountedRef.current) {
         toast({
-          title: 'Error',
-          description: 'Failed to load users data',
+          title: 'Erro',
+          description: 'Falha ao carregar os dados',
           variant: 'destructive',
         });
         setLoading(false);
       }
-    );
-    
-    return unsubscribe;
-  }, [toast]);
-
-  // Busca contatos com atualização em tempo real
-  const fetchContacts = useCallback(() => {
-    setLoading(true);
-    const q = query(collection(db, 'contacts'), orderBy('timestamp', 'desc'));
-    
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const contactsData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        confirmed: doc.data().confirmed || false,
-        pilotId: doc.data().pilotId || '',
-        rating: doc.data().rating || 0,
-        realized: doc.data().realized || false,
-        review: doc.data().review || '',
-        timestamp: doc.data().timestamp || null,
-        userId: doc.data().userId || ''
-      } as Contact));
-      
-      setContacts(contactsData);
-      setLoading(false);
-    }, (error) => {
-      console.error('Error fetching contacts:', error);
-      toast({
-        title: 'Error',
-        description: 'Falha ao carregar contatos',
-        variant: 'destructive',
-      });
-      setLoading(false);
-    });
-    
-    return unsubscribe;
-  }, [toast]);
-
-  // Fetch coupons with real-time updates
-  const fetchCoupons = useCallback(() => {
-    setLoadingCoupons(true);
-    const q = query(collection(db, 'coupons'), orderBy('createdAt', 'desc'));
-    
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const couponsData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        createdAt: doc.data().createdAt?.toDate(),
-        expiresAt: doc.data().expiresAt?.toDate(),
-        usedAt: doc.data().usedAt?.toDate() || null
-      } as Coupon));
-      
-      setCoupons(couponsData);
-      setLoadingCoupons(false);
-    }, (error) => {
-      console.error('Error fetching coupons:', error);
-      toast({
-        title: 'Erro',
-        description: 'Falha ao carregar cupons',
-        variant: 'destructive',
-      });
-      setLoadingCoupons(false);
-    });
-    
-    return unsubscribe;
-  }, [toast]);
+    }
+  }, [fetchPilots, fetchUsers, fetchContacts, fetchCoupons, toast]);
 
   // Handle pilot status change
-  const handleStatusChange = async (pilotId: string, newStatus: 'approved' | 'rejected') => {
+  const handleStatusChange = useCallback(async (pilotId: string, newStatus: 'approved' | 'rejected') => {
+    if (!isMountedRef.current) return;
+    
     try {
       await updateDoc(doc(db, 'pilots', pilotId), { status: newStatus });
-      setPilots(pilots.map(pilot => 
-        pilot.id === pilotId ? { ...pilot, status: newStatus } : pilot
-      ));
+      safeSetState(() => {
+        setPilots(prevPilots => 
+          prevPilots.map(pilot => 
+            pilot.id === pilotId ? { ...pilot, status: newStatus } : pilot
+          )
+        );
+      });
       toast({
         title: 'Success',
         description: `Pilot ${newStatus} successfully`,
@@ -267,10 +375,12 @@ const AdminDashboard = () => {
         variant: 'destructive',
       });
     }
-  };
+  }, [safeSetState, toast]);
 
   // Handle mark as used functionality
-  const handleMarkAsUsed = async (couponId: string, currentStatus: boolean) => {
+  const handleMarkAsUsed = useCallback(async (couponId: string, currentStatus: boolean) => {
+    if (!isMountedRef.current) return;
+    
     if (!window.confirm(`Tem certeza que deseja marcar este cupom como ${currentStatus ? 'não utilizado' : 'utilizado'}?`)) {
       return;
     }
@@ -297,76 +407,101 @@ const AdminDashboard = () => {
         variant: 'destructive',
       });
     }
-  };
+  }, [toast]);
 
-  // Update the main useEffect with proper cleanup
+  // Efeito principal para autenticação
   useEffect(() => {
-    let isMounted = true;
-    const unsubscribes: (() => void)[] = [];
-
-    const authUnsubscribe = onAuthStateChanged(auth, (user) => {
-      if (!user) {
-        navigate('/login');
-      } else if (isMounted) {
-        // Set up the real-time listeners
-        const pilotsUnsubscribe = fetchPilots();
-        const usersUnsubscribe = fetchUsers();
-        const contactsUnsubscribe = fetchContacts();
-        const couponsUnsubscribe = fetchCoupons();
+    let authUnsubscribe: (() => void) | null = null;
+    
+    try {
+      authUnsubscribe = onAuthStateChanged(auth, async (user) => {
+        if (!isMountedRef.current) return;
         
-        if (pilotsUnsubscribe) unsubscribes.push(pilotsUnsubscribe);
-        if (usersUnsubscribe) unsubscribes.push(usersUnsubscribe);
-        if (contactsUnsubscribe) unsubscribes.push(contactsUnsubscribe);
-        if (couponsUnsubscribe) unsubscribes.push(couponsUnsubscribe);
-      }
-    });
-
-    return () => {
-      isMounted = false;
-      authUnsubscribe();
-      // Clean up all subscriptions
-      unsubscribes.forEach(unsubscribe => {
-        if (unsubscribe && typeof unsubscribe === 'function') {
-          unsubscribe();
+        if (!user) {
+          isAuthenticatedRef.current = false;
+          cleanup();
+          navigate('/login');
+        } else {
+          isAuthenticatedRef.current = true;
+          // Fetch data once when authenticated
+          await fetchAllData();
         }
       });
-    };
-  }, [navigate, toast, fetchPilots, fetchUsers, fetchContacts, fetchCoupons]);
-
-  // Update other useEffects to include proper dependencies
-  useEffect(() => {
-    if (pilots.length > 0 || users.length > 0 || contacts.length > 0 || coupons.length > 0) {
-      const currentDate = new Date();
-      const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
-      
-      const toDate = (timestamp: any) => {
-        if (!timestamp) return null;
-        return timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-      };
-      
-      setStats({
-        totalPilots: pilots.length,
-        activePilots: pilots.filter(p => p.status === 'approved').length,
-        pendingPilots: pilots.filter(p => p.status === 'pending').length,
-        totalUsers: users.length,
-        newUsersThisMonth: users.filter(u => {
-          const userDate = toDate(u.createdAt);
-          return userDate && userDate >= firstDayOfMonth;
-        }).length,
-        totalContacts: contacts.length,
-        realizedContacts: contacts.filter(c => c.realized).length,
-        totalCoupons: coupons.length,
-        usedCoupons: coupons.filter(c => c.used).length,
-        activeCoupons: coupons.filter(c => {
-          const expiresAt = toDate(c.expiresAt);
-          return !c.used && (!expiresAt || expiresAt >= currentDate);
-        }).length,
-        expiredCoupons: coupons.filter(c => {
-          const expiresAt = toDate(c.expiresAt);
-          return expiresAt && expiresAt < currentDate;
-        }).length
-      });
+    } catch (error) {
+      console.error('Error setting up auth listener:', error);
     }
+
+    return () => {
+      if (authUnsubscribe) {
+        authUnsubscribe();
+      }
+    };
+  }, [navigate, cleanup, fetchAllData]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+      cleanup();
+    };
+  }, [cleanup]);
+
+  // Cálculo de estatísticas com debounce para evitar cálculos excessivos
+  useEffect(() => {
+    if (!isMountedRef.current) return;
+    
+    const timeoutId = setTimeout(() => {
+      if (pilots.length > 0 || users.length > 0 || contacts.length > 0 || coupons.length > 0) {
+        const currentDate = new Date();
+        const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+        
+        // Helper function to safely convert Firestore timestamps
+        const toDate = (timestamp: any) => {
+          if (!timestamp) return null;
+          try {
+            return timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+          } catch {
+            return null;
+          }
+        };
+        
+        const newStats = {
+          // Pilots
+          totalPilots: pilots.length,
+          activePilots: pilots.filter(p => p.status === 'approved').length,
+          pendingPilots: pilots.filter(p => p.status === 'pending').length,
+          
+          // Users
+          totalUsers: users.length,
+          newUsersThisMonth: users.filter(u => {
+            const userDate = toDate(u.createdAt);
+            return userDate && userDate >= firstDayOfMonth;
+          }).length,
+          
+          // Contacts
+          totalContacts: contacts.length,
+          realizedContacts: contacts.filter(c => c.realized).length,
+          
+          // Coupons
+          totalCoupons: coupons.length,
+          usedCoupons: coupons.filter(c => c.used).length,
+          activeCoupons: coupons.filter(c => {
+            const expiresAt = toDate(c.expiresAt);
+            return !c.used && (!expiresAt || expiresAt >= currentDate);
+          }).length,
+          expiredCoupons: coupons.filter(c => {
+            const expiresAt = toDate(c.expiresAt);
+            return expiresAt && expiresAt < currentDate;
+          }).length
+        };
+        
+        if (isMountedRef.current) {
+          setStats(newStats);
+        }
+      }
+    }, 300); // Debounce de 300ms
+
+    return () => clearTimeout(timeoutId);
   }, [pilots, users, contacts, coupons]);
 
   // Pagination logic
@@ -376,17 +511,26 @@ const AdminDashboard = () => {
   const totalPages = Math.ceil(pilots.length / itemsPerPage);
 
   // Format date helper function
-  const formatDate = (date: Date | { toDate: () => Date } | null | undefined) => {
+  const formatDate = useCallback((date: Date | { toDate: () => Date } | null | undefined) => {
     if (!date) return 'N/A';
     
     try {
-      // If it's a Firestore timestamp, convert it to a Date
-      const dateObj = date instanceof Date 
-        ? date 
-        : typeof date === 'object' && date !== null && 'toDate' in date 
-          ? date.toDate() 
-          : new Date(date as any);
+      // Handle Firestore timestamp
+      if (date && typeof date === 'object' && 'toDate' in date) {
+        const dateObj = date.toDate();
+        if (isNaN(dateObj.getTime())) return 'Data inválida';
+        
+        return new Intl.DateTimeFormat('pt-BR', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        }).format(dateObj);
+      }
       
+      // Handle regular Date or string/number
+      const dateObj = new Date(date as Date);
       if (isNaN(dateObj.getTime())) return 'Data inválida';
       
       return new Intl.DateTimeFormat('pt-BR', {
@@ -397,22 +541,22 @@ const AdminDashboard = () => {
         minute: '2-digit'
       }).format(dateObj);
     } catch (error) {
-      console.error('Erro ao formatar data:', date, error);
+      console.error('Error formatting date:', error);
       return 'Data inválida';
     }
-  };
+  }, []);
 
   // Get coupon status
-  const getCouponStatus = (coupon: Coupon) => {
+  const getCouponStatus = useCallback((coupon: Coupon) => {
     if (coupon.used) return { text: 'Utilizado', className: 'bg-gray-100 text-gray-800' };
     if (coupon.expiresAt && coupon.expiresAt < new Date()) {
       return { text: 'Expirado', className: 'bg-red-100 text-red-800' };
     }
     return { text: 'Ativo', className: 'bg-green-100 text-green-800' };
-  };
+  }, []);
 
   // Get recipient type display
-  const getRecipientTypeDisplay = (type: string) => {
+  const getRecipientTypeDisplay = useCallback((type: string) => {
     switch (type) {
       case 'proprio':
         return { text: 'Próprio Uso', className: 'bg-blue-100 text-blue-800' };
@@ -423,7 +567,7 @@ const AdminDashboard = () => {
       default:
         return { text: type, className: 'bg-gray-100 text-gray-800' };
     }
-  };
+  }, []);
 
   if (loading) {
     return (
@@ -750,21 +894,12 @@ const AdminDashboard = () => {
               <CardHeader>
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                   <div>
-                    <div className="flex items-center gap-4">
-                      <CardTitle>Gerenciar Pilotos</CardTitle>
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => navigate('/add-pilot')}
-                      >
-                        Criar Piloto
-                      </Button>
-                    </div>
+                    <CardTitle>Gerenciar Pilotos</CardTitle>
                     <p className="text-sm text-gray-500 mt-1">
                       {pilots.length} pilotos cadastrados
                     </p>
                   </div>
-                  <Button onClick={fetchPilots} disabled={loading}>
+                  <Button onClick={fetchAllData} disabled={loading}>
                     {loading ? 'Atualizando...' : 'Atualizar Lista'}
                   </Button>
                 </div>

@@ -20,6 +20,7 @@ import {
   getCountFromServer 
 } from "firebase/firestore";
 import { onAuthStateChanged, User } from "firebase/auth";
+import { sendGiftEmail } from "@/services/emailService";
 import {
   AlertDialog,
   AlertDialogTrigger,
@@ -440,6 +441,106 @@ const MyFlights = () => {
         console.error('Erro ao converter milhas:', error);
         window.alert('Ocorreu um erro ao processar sua solicitação. Por favor, tente novamente.');
       }
+    } else if (action === 'Presentear amigo') {
+      const handleGiftToFriend = async () => {
+        if (miles < 1000) {
+          window.alert(`Você precisa de pelo menos 1000 milhas para presentear um voo duplo. Você tem ${miles} milhas.`);
+          return;
+        }
+
+        // Ask for friend's email and name
+        const friendEmail = window.prompt('Digite o e-mail do(a) amigo(a) que receberá o cupom de voo duplo:');
+        if (!friendEmail) return; // User cancelled
+
+        // Simple email validation
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(friendEmail)) {
+          window.alert('Por favor, insira um e-mail válido.');
+          return;
+        }
+
+        // Ask for friend's name (optional)
+        const friendName = window.prompt('Digite o nome do(a) seu(sua) amigo(a) (opcional):') || '';
+        
+        // Ask for a personal message (optional)
+        const message = window.prompt('Deixe uma mensagem para o(a) seu(sua) amigo(a) (opcional):') || '';
+
+        try {
+          const user = auth.currentUser;
+          if (!user) {
+            window.alert('Usuário não autenticado');
+            return;
+          }
+
+          // Check if the email is the same as the user's email
+          if (friendEmail === user.email) {
+            window.alert('Você não pode presentear um voo para si mesmo. Use a opção "Converter em voo duplo" para uso próprio.');
+            return;
+          }
+
+          // Create coupon data
+          const currentDate = new Date();
+          const couponNumber = `GS-${Date.now().toString(36).toUpperCase()}-${Math.floor(Math.random() * 1000).toString().padStart(4, '0')}`;
+          
+          const couponData = {
+            userId: user.uid,
+            userEmail: user.email || '',
+            recipientEmail: friendEmail,
+            couponNumber: couponNumber,
+            type: 'dual_flight',
+            value: 1,
+            used: false,
+            recipientType: 'indicacao',
+            createdAt: currentDate,
+            expiresAt: new Date(currentDate.getFullYear(), currentDate.getMonth() + 6, currentDate.getDate()),
+            usedAt: null,
+            status: 'pending' // Indicates the gift is pending acceptance
+          };
+
+          // Add coupon to Firestore
+          const couponRef = await addDoc(collection(db, 'coupons'), couponData);
+          
+          // Update user's miles
+          const newMiles = Math.max(0, miles - 1000);
+          const userRef = doc(db, 'users', user.uid);
+          await updateDoc(userRef, {
+            miles: newMiles
+          });
+
+          // Send email to friend
+          const emailResult = await sendGiftEmail({
+            friendEmail,
+            friendName,
+            couponCode: couponNumber,
+            senderName: user.displayName || 'Um amigo',
+            message
+          });
+
+          if (!emailResult.success) {
+            console.error('Failed to send gift email:', emailResult.error);
+            // Still continue as the coupon was created successfully
+          }
+
+          // Update local state
+          setProfile(prev => ({
+            ...prev,
+            miles: newMiles
+          }));
+
+          // Show success message
+          window.alert(
+            `🎁 Presente enviado com sucesso!\n\n` +
+            `Você presenteou 1 voo duplo para:\n${friendEmail}\n\n` +
+            `Número do cupom: ${couponNumber}\n` +
+            `Um e-mail foi enviado para o(a) seu(sua) amigo(a) com as instruções para resgatar o voo.`
+          );
+        } catch (error) {
+          console.error('Error gifting flight:', error);
+          window.alert('Ocorreu um erro ao processar seu pedido. Por favor, tente novamente.');
+        }
+      };
+
+      handleGiftToFriend();
     } else if (action === 'Doar para Banco de Sonhos') {
       // Verifica se o usuário tem milhas suficientes (1000 milhas para doar)
       if (miles < 1000) {
@@ -489,174 +590,8 @@ const MyFlights = () => {
         window.alert(`Parabéns! Você doou 1000 milhas para o Banco de Sonhos!`);
       } catch (error) {
         console.error('Erro ao doar milhas:', error);
-        window.alert('Ocorreu um erro ao processar sua solicitação. Por favor, tente novamente.');
+        window.alert('Ocorreu um erro ao processar a sua solicitação. Por favor, tente novamente.');
       }
-    } else if (action === 'Presentear amigo') {
-      const handleGiftToFriend = async () => {
-        if (miles < 1000) {
-          window.alert(`Você precisa de pelo menos 1000 milhas para presentear um voo duplo. Você tem ${miles} milhas.`);
-          return;
-        }
-
-        // Ask for friend's email
-        const friendEmail = window.prompt('Digite o e-mail do(a) amigo(a) que receberá o cupom de voo duplo:');
-        if (!friendEmail) return; // User cancelled
-
-        // Simple email validation
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(friendEmail)) {
-          window.alert('Por favor, insira um e-mail válido.');
-          return;
-        }
-
-        try {
-          const user = auth.currentUser;
-          if (!user) {
-            window.alert('Usuário não autenticado');
-            return;
-          }
-
-          // Check if the email is the same as the user's email
-          if (friendEmail === user.email) {
-            window.alert('Você não pode presentear um voo para si mesmo. Use a opção "Converter em voo duplo" para uso próprio.');
-            return;
-          }
-
-          // Create coupon data
-          const currentDate = new Date();
-          const couponNumber = `GS-${Date.now().toString(36).toUpperCase()}-${Math.floor(Math.random() * 1000).toString().padStart(4, '0')}`;
-          
-          const couponData = {
-            userId: user.uid,
-            userEmail: user.email || '',
-            recipientEmail: friendEmail,
-            couponNumber: couponNumber,
-            type: 'dual_flight',
-            value: 1,
-            used: false,
-            recipientType: 'indicacao',
-            createdAt: currentDate,
-            expiresAt: new Date(currentDate.getFullYear(), currentDate.getMonth() + 6, currentDate.getDate()),
-            usedAt: null,
-            status: 'pending' // Indicates the gift is pending acceptance
-          };
-
-          // Add coupon to Firestore
-          await addDoc(collection(db, 'coupons'), couponData);
-          
-          // Update user's miles
-          const newMiles = Math.max(0, miles - 1000);
-          const userRef = doc(db, 'users', user.uid);
-          await updateDoc(userRef, {
-            miles: newMiles
-          });
-
-          // Update local state
-          setProfile(prev => ({
-            ...prev,
-            miles: newMiles
-          }));
-
-          // Show success message
-          window.alert(
-            `🎁 Presente enviado com sucesso!\n\n` +
-            `Você presenteou 1 voo duplo para:\n${friendEmail}\n\n` +
-            `Número do cupom: ${couponNumber}\n` +
-            `Um e-mail foi enviado para o(a) seu(sua) amigo(a) com as instruções para resgatar o voo.`
-          );
-
-          // TODO: Send email to friend with the coupon details
-          // This would typically be done with a Cloud Function or backend API
-          
-        } catch (error) {
-          console.error('Erro ao presentear voo duplo:', error);
-          window.alert('Ocorreu um erro ao processar a sua solicitação. Por favor, tente novamente.');
-        }
-      };
-      handleGiftToFriend();
-    } else if (action === 'Presentear amigo') {
-      const handleGiftToFriend = async () => {
-        if (miles < 1000) {
-          window.alert(`Você precisa de pelo menos 1000 milhas para presentear um voo duplo. Você tem ${miles} milhas.`);
-          return;
-        }
-
-        // Ask for friend's email
-        const friendEmail = window.prompt('Digite o e-mail do(a) amigo(a) que receberá o cupom de voo duplo:');
-        if (!friendEmail) return; // User cancelled
-
-        // Simple email validation
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(friendEmail)) {
-          window.alert('Por favor, insira um e-mail válido.');
-          return;
-        }
-
-        try {
-          const user = auth.currentUser;
-          if (!user) {
-            window.alert('Usuário não autenticado');
-            return;
-          }
-
-          // Check if the email is the same as the user's email
-          if (friendEmail === user.email) {
-            window.alert('Você não pode presentear um voo para si mesmo. Use a opção "Converter em voo duplo" para uso próprio.');
-            return;
-          }
-
-          // Create coupon data
-          const currentDate = new Date();
-          const couponNumber = `GS-${Date.now().toString(36).toUpperCase()}-${Math.floor(Math.random() * 1000).toString().padStart(4, '0')}`;
-          
-          const couponData = {
-            userId: user.uid,
-            userEmail: user.email || '',
-            recipientEmail: friendEmail,
-            couponNumber: couponNumber,
-            type: 'dual_flight',
-            value: 1,
-            used: false,
-            recipientType: 'indicacao',
-            createdAt: currentDate,
-            expiresAt: new Date(currentDate.getFullYear(), currentDate.getMonth() + 6, currentDate.getDate()),
-            usedAt: null,
-            status: 'pending' // Indicates the gift is pending acceptance
-          };
-
-          // Add coupon to Firestore
-          await addDoc(collection(db, 'coupons'), couponData);
-          
-          // Update user's miles
-          const newMiles = Math.max(0, miles - 1000);
-          const userRef = doc(db, 'users', user.uid);
-          await updateDoc(userRef, {
-            miles: newMiles
-          });
-
-          // Update local state
-          setProfile(prev => ({
-            ...prev,
-            miles: newMiles
-          }));
-
-          // Show success message
-          window.alert(
-            `🎁 Presente enviado com sucesso!\n\n` +
-            `Você presenteou 1 voo duplo para:\n${friendEmail}\n\n` +
-            `Número do cupom: ${couponNumber}\n` +
-            `Um e-mail foi enviado para o(a) seu(sua) amigo(a) com as instruções para resgatar o voo.`
-          );
-
-          // TODO: Send email to friend with the coupon details
-          // This would typically be done with a Cloud Function or backend API
-          
-        } catch (error) {
-          console.error('Erro ao presentear voo duplo:', error);
-          window.alert('Ocorreu um erro ao processar a sua solicitação. Por favor, tente novamente.');
-        }
-      };
-      handleGiftToFriend();
     } else {
       // Mantém o comportamento original para outras ações
       window.alert(`${action} em desenvolvimento!`);

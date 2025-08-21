@@ -1,10 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import Header from "@/components/Header";
 import PilotCard from "@/components/PilotCard";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
-import { collection, onSnapshot, query, where } from "firebase/firestore";
+import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
 interface Pilot {
@@ -26,13 +26,19 @@ const SearchResults = () => {
   const location = searchParams.get('location') || '';
   const [pilots, setPilots] = useState<Pilot[]>([]);
   const [loading, setLoading] = useState(true);
+  const isMountedRef = useRef(true);
 
-  useEffect(() => {
-    setLoading(true);
-    let q = collection(db, "pilots");
+  const fetchPilots = useCallback(async () => {
+    if (!isMountedRef.current) return;
     
-    onSnapshot(q, (snapshot) => {
-      const all = snapshot.docs.map(doc => {
+    try {
+      setLoading(true);
+      const q = collection(db, "pilots");
+      const querySnapshot = await getDocs(q);
+      
+      if (!isMountedRef.current) return;
+      
+      const all = querySnapshot.docs.map(doc => {
         const data = doc.data();
         return {
           id: doc.id,
@@ -56,9 +62,23 @@ const SearchResults = () => {
         : all;
         
       setPilots(filteredPilots);
-      setLoading(false);
-    });
+    } catch (error) {
+      console.error('Erro ao buscar pilotos:', error);
+    } finally {
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
+    }
   }, [location]);
+
+  useEffect(() => {
+    fetchPilots();
+    
+    // Cleanup no unmount
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, [fetchPilots]);
 
   return (
     <div className="min-h-screen bg-background">

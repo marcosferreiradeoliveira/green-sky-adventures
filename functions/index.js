@@ -1,30 +1,42 @@
-const { onCall, HttpsError } = require('firebase-functions/v2/https');
-const { logger } = require('firebase-functions');
-const admin = require('firebase-admin');
-const nodemailer = require('nodemailer');
+import { onCall, HttpsError, onRequest } from 'firebase-functions/v2/https';
+import { initializeApp } from 'firebase-admin/app';
+import { getAuth } from 'firebase-admin/auth';
+import nodemailer from 'nodemailer';
+import express from 'express';
 
 // Initialize Firebase Admin
-admin.initializeApp();
+initializeApp();
 
 // Create reusable transporter object using Gmail SMTP
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
-    user: process.env.GMAIL_EMAIL, // Your Gmail address
-    pass: process.env.GMAIL_APP_PASSWORD // Your Gmail App Password
+    user: process.env.GMAIL_EMAIL,
+    pass: process.env.GMAIL_APP_PASSWORD
   }
 });
 
+// Create Express app for health checks
+const app = express();
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.status(200).send('OK');
+});
+
 // Cloud Function to send gift email
-exports.sendGiftEmail = onCall(
+export const sendGiftEmail = onCall(
   { 
-    enforceAppCheck: false,
-    region: 'southamerica-east1'
-  }, 
+    region: 'us-central1',
+    timeoutSeconds: 60,
+    memory: '256MB',
+    minInstances: 0,
+    maxInstances: 10
+  },
   async (request) => {
     const { data, auth } = request;
     
-    logger.log('Recebida requisição para enviar email:', { 
+    console.log('Recebida requisição para enviar email:', { 
       auth: auth,
       data: { 
         to: data.to,
@@ -36,25 +48,25 @@ exports.sendGiftEmail = onCall(
     });
 
     // Check if the request is authenticated
-    if (!auth) {
-      logger.error('Usuário não autenticado');
-      throw new HttpsError(
-        'unauthenticated',
-        'Você precisa estar logado para enviar um presente.'
-      );
-    }
+    // if (!auth) {
+    //   console.error('Usuário não autenticado');
+    //   throw new HttpsError(
+    //     'unauthenticated',
+    //     'Você precisa estar logado para enviar um presente.'
+    //   );
+    // }
 
     const { to, friendName, couponCode, senderName, message } = data;
 
-    // Validate required fields
-    if (!to || !couponCode) {
-      const errorMsg = 'E-mail do destinatário e código do cupom são obrigatórios.';
-      logger.error(errorMsg, { to, couponCode });
-      throw new HttpsError(
-        'invalid-argument',
-        errorMsg
-      );
-    }
+    // // Validate required fields
+    // if (!to || !couponCode) {
+    //   const errorMsg = 'E-mail do destinatário e código do cupom são obrigatórios.';
+    //   console.error(errorMsg, { to, couponCode });
+    //   throw new HttpsError(
+    //     'invalid-argument',
+    //     errorMsg
+    //   );
+    // }
 
     try {
       // Email options
@@ -93,34 +105,34 @@ exports.sendGiftEmail = onCall(
 
       // Send email
       const info = await transporter.sendMail(mailOptions);
-      logger.log('Email enviado com sucesso:', info.messageId);
+      console.log('Email enviado com sucesso:', info.messageId);
       
       // Log the email sending
       const logEntry = {
         to,
         template: 'gift-flight',
         couponCode,
-        sentAt: admin.firestore.FieldValue.serverTimestamp(),
+        sentAt: initializeApp().firestore.FieldValue.serverTimestamp(),
         status: 'sent',
         provider: 'gmail-smtp',
         messageId: info.messageId,
         senderId: auth.uid
       };
       
-      await admin.firestore().collection('emailLogs').add(logEntry);
+      await initializeApp().firestore().collection('emailLogs').add(logEntry);
       
       return { success: true, message: 'E-mail enviado com sucesso!', messageId: info.messageId };
       
     } catch (error) {
-      logger.error('Erro na função sendGiftEmail:', error);
+      console.error('Erro na função sendGiftEmail:', error);
       
       // Log the error
-      await admin.firestore().collection('emailLogs').add({
+      await initializeApp().firestore().collection('emailLogs').add({
         to: data.to,
         template: 'gift-flight',
         couponCode: data.couponCode,
         error: error.toString(),
-        sentAt: admin.firestore.FieldValue.serverTimestamp(),
+        sentAt: initializeApp().firestore.FieldValue.serverTimestamp(),
         status: 'failed',
         provider: 'gmail-smtp',
         senderId: auth?.uid
@@ -138,3 +150,6 @@ exports.sendGiftEmail = onCall(
     }
   }
 );
+
+// Export the Express app for Cloud Run
+export const api = onRequest({ region: 'us-central1' }, app);
