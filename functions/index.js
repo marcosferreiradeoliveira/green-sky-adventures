@@ -125,11 +125,11 @@ export const sendGiftEmail = onCall(
   }
 );
 
-// Only start the server if this is running locally (not in Cloud Functions environment)
-if (process.env.FUNCTIONS_EMULATOR) {
-  const PORT = process.env.PORT || 8080;
-  const server = app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+// Start the server if not in Firebase Functions environment
+const PORT = process.env.FUNCTIONS_EMULATOR ? 8081 : 8080;
+if (process.env.FUNCTIONS_EMULATOR || process.env.NODE_ENV !== 'production') {
+  const server = app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server running on http://0.0.0.0:${PORT}`);
   });
 
   // Handle shutdown gracefully
@@ -143,7 +143,7 @@ if (process.env.FUNCTIONS_EMULATOR) {
 
 // Export the Express app for Cloud Run
 export const api = onRequest({
-  region: 'us-central1',
+  region: 'southamerica-east1',
   minInstances: 0,
   maxInstances: 10,
   memory: '256MB',
@@ -151,3 +151,8 @@ export const api = onRequest({
   concurrency: 80,
   cpu: 1
 }, app);
+
+// For local testing with Firebase Emulator
+if (process.env.FUNCTIONS_EMULATOR) {
+  console.log('Running in Firebase Emulator mode');
+}
