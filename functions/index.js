@@ -2,22 +2,51 @@ import { onCall, HttpsError, onRequest } from 'firebase-functions/v2/https';
 import { initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import nodemailer from 'nodemailer';
+import { google } from 'googleapis';
 import express from 'express';
+import cors from 'cors';
 
 // Initialize Firebase Admin
 const admin = initializeApp();
 
-// Create reusable transporter object using Gmail SMTP
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.GMAIL_EMAIL,
-    pass: process.env.GMAIL_APP_PASSWORD
-  }
+// Create OAuth2 client
+const oauth2Client = new google.auth.OAuth2(
+  process.env.OAUTH_CLIENT_ID,
+  process.env.OAUTH_CLIENT_SECRET,
+  'https://developers.google.com/oauthplayground'
+);
+
+oauth2Client.setCredentials({
+  refresh_token: process.env.OAUTH_REFRESH_TOKEN
 });
+
+// Create reusable transporter object using Gmail SMTP with OAuth2
+async function createTransporter() {
+  try {
+    const accessToken = await oauth2Client.getAccessToken();
+    
+    return nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        type: 'OAuth2',
+        user: process.env.OAUTH_EMAIL,
+        clientId: process.env.OAUTH_CLIENT_ID,
+        clientSecret: process.env.OAUTH_CLIENT_SECRET,
+        refreshToken: process.env.OAUTH_REFRESH_TOKEN,
+        accessToken: accessToken.token
+      }
+    });
+  } catch (error) {
+    console.error('Error creating OAuth2 client:', error);
+    throw new Error('Failed to create email transporter');
+  }
+}
 
 // Create Express app
 const app = express();
+
+// Enable CORS for all routes
+app.use(cors({ origin: true }));
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -27,11 +56,12 @@ app.get('/health', (req, res) => {
 // Cloud Function to send gift email
 export const sendGiftEmail = onCall(
   { 
-    region: 'us-central1',
+    region: 'southamerica-east1',
     timeoutSeconds: 60,
     memory: '256MB',
     minInstances: 0,
-    maxInstances: 10
+    maxInstances: 10,
+    cors: true  // Enable CORS for this callable function
   },
   async (request) => {
     const { data, auth } = request;
@@ -61,7 +91,7 @@ export const sendGiftEmail = onCall(
       'Atenciosamente,\nEquipe Green Sky';
 
     const mailOptions = {
-      from: `"Green Sky" <${process.env.GMAIL_EMAIL}>`,
+      from: `"Green Sky" <${process.env.OAUTH_EMAIL}>`,
       to: to,
       subject: 'Você recebeu um presente especial!',
       text: emailText,
@@ -81,6 +111,7 @@ export const sendGiftEmail = onCall(
     };
 
     try {
+      const transporter = await createTransporter();
       await transporter.sendMail(mailOptions);
       console.log(`E-mail enviado para ${to}`);
       return { success: true, message: 'E-mail enviado com sucesso!' };
