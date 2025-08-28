@@ -125,6 +125,15 @@ export const sendGiftEmail = onCall(
   }
 );
 
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error('Error:', err);
+  res.status(500).send({ error: 'Something went wrong!' });
+});
+
+// Export the Express app as an HTTP function
+export const api = onRequest(app);
+
 // Start the server if not in Firebase Functions environment
 const PORT = process.env.FUNCTIONS_EMULATOR ? 8081 : 8080;
 if (process.env.FUNCTIONS_EMULATOR || process.env.NODE_ENV !== 'production') {
@@ -140,17 +149,6 @@ if (process.env.FUNCTIONS_EMULATOR || process.env.NODE_ENV !== 'production') {
     });
   });
 }
-
-// Export the Express app for Cloud Run
-export const api = onRequest({
-  region: 'southamerica-east1',
-  minInstances: 0,
-  maxInstances: 10,
-  memory: '256MB',
-  timeoutSeconds: 60,
-  concurrency: 80,
-  cpu: 1
-}, app);
 
 // For local testing with Firebase Emulator
 if (process.env.FUNCTIONS_EMULATOR) {
