@@ -16,7 +16,33 @@ const app = express();
 const port = process.env.PORT || 8080;
 
 // Security Middleware
-app.use(helmet()); // Adds security headers
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      imgSrc: ["'self'", 'data:', 'https://images.unsplash.com', 'https://www.google.com'],
+      connectSrc: [
+        "'self'",
+        'https://*.googleapis.com',
+        'https://*.firebaseio.com',
+        'wss://*.firebaseio.com',
+        'https://*.firebase.com',
+        'wss://*.firebase.com',
+        'https://*.google.com',
+        'wss://*.google.com'
+      ],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'"],
+      fontSrc: ["'self'"],
+      frameSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      upgradeInsecureRequests: []
+    }
+  },
+  crossOriginEmbedderPolicy: false
+}));
+
+// CORS Configuration
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
     ? ['https://your-production-domain.com'] 
