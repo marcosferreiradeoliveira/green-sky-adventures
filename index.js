@@ -20,7 +20,27 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      imgSrc: ["'self'", 'data:', 'https://images.unsplash.com', 'https://www.google.com'],
+      styleSrc: [
+        "'self'",
+        'https://fonts.googleapis.com',
+        "'unsafe-inline'"
+      ],
+      fontSrc: [
+        "'self'",
+        'https://fonts.gstatic.com',
+        'data:'
+      ],
+      imgSrc: [
+        "'self'",
+        'data:',
+        'https://images.unsplash.com',
+        'https://www.google.com',
+        'https://*.google.com',
+        'https://*.googleusercontent.com',
+        'https://*.google-analytics.com',
+        'https://*.doubleclick.net',
+        'https://*.gstatic.com'
+      ],
       connectSrc: [
         "'self'",
         'https://*.googleapis.com',
@@ -29,12 +49,22 @@ app.use(helmet({
         'https://*.firebase.com',
         'wss://*.firebase.com',
         'https://*.google.com',
-        'wss://*.google.com'
+        'wss://*.google.com',
+        'https://*.gstatic.com',
+        'https://*.google-analytics.com',
+        'https://*.analytics.google.com'
       ],
-      scriptSrc: ["'self'"],
-      styleSrc: ["'self'"],
-      fontSrc: ["'self'"],
-      frameSrc: ["'self'"],
+      scriptSrc: [
+        "'self'",
+        "'unsafe-inline'",
+        "'unsafe-eval'"
+      ],
+      frameSrc: [
+        "'self'",
+        'https://*.google.com',
+        'https://*.firebaseapp.com',
+        'https://*.gstatic.com'
+      ],
       objectSrc: ["'none'"],
       upgradeInsecureRequests: []
     }
