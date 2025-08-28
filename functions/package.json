@@ -4,12 +4,12 @@
   "type": "module",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js",
-    "lint": "eslint . --quiet --fix",
+    "start": "firebase emulators:start --only functions",
     "serve": "firebase emulators:start --only functions",
     "shell": "firebase functions:shell",
     "deploy": "firebase deploy --only functions",
-    "logs": "firebase functions:log"
+    "logs": "firebase functions:log",
+    "lint": "eslint . --quiet --fix"
   },
   "engines": {
     "node": "20"
