@@ -12,30 +12,16 @@ let db: Firestore;
 let storage: FirebaseStorage;
 
 async function getFirebaseConfig() {
-  if (import.meta.env.DEV) {
-    // In development, use environment variables
-    return {
-      apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-      authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-      projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-      storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-      messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-      appId: import.meta.env.VITE_FIREBASE_APP_ID,
-      measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
-    };
-  } else {
-    // In production, fetch from server
-    try {
-      const response = await fetch('/firebase-config');
-      if (!response.ok) {
-        throw new Error('Failed to fetch Firebase config');
-      }
-      return await response.json();
-    } catch (error) {
-      console.error('Error fetching Firebase config:', error);
-      throw error;
-    }
-  }
+  // Use environment variables for both development and production
+  return {
+    apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+    appId: import.meta.env.VITE_FIREBASE_APP_ID,
+    measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
+  };
 }
 
 export async function initializeFirebase() {
