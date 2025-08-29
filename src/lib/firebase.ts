@@ -1,117 +1,94 @@
-// Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
+import { initializeApp, getApps, getApp, FirebaseApp } from "firebase/app";
 import { getAnalytics, logEvent, setUserProperties, setUserId, isSupported } from "firebase/analytics";
-import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
-import { getStorage } from "firebase/storage";
+import { getAuth, Auth } from "firebase/auth";
+import { getFirestore, Firestore } from "firebase/firestore";
+import { getStorage, FirebaseStorage } from "firebase/storage";
 import { Analytics, EventParams } from "firebase/analytics";
 
-// Check if Firebase environment variables are available
-const requiredEnvVars = [
-  'VITE_FIREBASE_API_KEY',
-  'VITE_FIREBASE_AUTH_DOMAIN',
-  'VITE_FIREBASE_PROJECT_ID',
-  'VITE_FIREBASE_STORAGE_BUCKET',
-  'VITE_FIREBASE_MESSAGING_SENDER_ID',
-  'VITE_FIREBASE_APP_ID',
-  'VITE_FIREBASE_MEASUREMENT_ID'
-];
+let app: FirebaseApp;
+let analytics: Analytics | null = null;
+let auth: Auth;
+let db: Firestore;
+let storage: FirebaseStorage;
 
-const missingVars = requiredEnvVars.filter(varName => !import.meta.env[varName]);
-
-if (missingVars.length > 0) {
-  console.error('Missing required Firebase environment variables:', missingVars.join(', '));
+async function getFirebaseConfig() {
   if (import.meta.env.DEV) {
-    console.warn('Running in development mode with mock data. Firebase features will be limited.');
+    // In development, use environment variables
+    return {
+      apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+      authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+      projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+      storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+      messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+      appId: import.meta.env.VITE_FIREBASE_APP_ID,
+      measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
+    };
   } else {
-    throw new Error('Missing required Firebase configuration');
+    // In production, fetch from server
+    try {
+      const response = await fetch('/firebase-config');
+      if (!response.ok) {
+        throw new Error('Failed to fetch Firebase config');
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching Firebase config:', error);
+      throw error;
+    }
   }
 }
 
-// Firebase configuration - will use environment variables
-const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
-};
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-
-// Initialize services with null defaults
-let analytics: Analytics | null = null;
-let auth = getAuth(app);
-let db = getFirestore(app);
-let storage = getStorage(app);
-
-// Initialize analytics if supported and in production
-const initAnalytics = async () => {
+export async function initializeFirebase() {
   try {
-    const isAnalyticsSupported = await isSupported();
-    if (isAnalyticsSupported) {
-      analytics = getAnalytics(app);
-      // Set user properties if needed
-      if (auth.currentUser) {
-        setUserId(analytics, auth.currentUser.uid);
-        setUserProperties(analytics, {
-          user_type: 'visitor', // Will be updated after login
-        });
+    if (getApps().length === 0) {
+      const firebaseConfig = await getFirebaseConfig();
+      app = initializeApp(firebaseConfig);
+      
+      // Initialize services
+      auth = getAuth(app);
+      db = getFirestore(app);
+      storage = getStorage(app);
+      
+      // Initialize analytics if supported
+      if (await isSupported()) {
+        analytics = getAnalytics(app);
       }
-      return analytics;
+    } else {
+      app = getApp();
+      auth = getAuth(app);
+      db = getFirestore(app);
+      storage = getStorage(app);
+      if (await isSupported()) {
+        analytics = getAnalytics(app);
+      }
     }
-    return null;
+    
+    return { app, auth, db, storage, analytics };
   } catch (error) {
-    console.error('Analytics initialization error:', error);
-    return null;
+    console.error('Error initializing Firebase:', error);
+    throw error;
   }
-};
+}
 
 // Track page views
-export const logPageView = (pageTitle: string, pagePath: string) => {
-  if (!analytics) return;
-  
-  logEvent(analytics, 'page_view', {
-    page_title: pageTitle,
-    page_path: pagePath,
-    page_location: window.location.href,
-  });
-};
+export function logPageView(pageTitle: string, pagePath: string) {
+  if (analytics) {
+    logEvent(analytics, 'page_view', {
+      page_title: pageTitle,
+      page_path: pagePath,
+    });
+  }
+}
 
 // Track custom events
-export const trackEvent = (eventName: string, params?: EventParams) => {
-  if (!analytics) return;
-  
-  logEvent(analytics, eventName, params);
-};
-
-// Initialize Firebase services
-const initFirebase = async () => {
-  try {
-    console.log('Initializing Firebase services...');
-    
-    // Initialize analytics (non-blocking)
-    initAnalytics().then(analyticsInstance => {
-      analytics = analyticsInstance;
-      console.log('Analytics initialized:', analytics ? 'success' : 'not supported');
-    }).catch(err => {
-      console.error('Error initializing analytics:', err);
-    });
-    
-    console.log('Firebase services initialized successfully');
-    return { app, analytics, auth, db, storage };
-  } catch (error) {
-    console.error('Failed to initialize Firebase services:', error);
-    // Return the services that did initialize successfully
-    return { app, analytics, auth, db, storage };
+export function trackEvent(eventName: string, params?: EventParams) {
+  if (analytics) {
+    logEvent(analytics, eventName, params);
   }
-};
+}
 
-// Export a promise that resolves when Firebase is initialized
-export const firebaseInit = initFirebase();
+// Initialize Firebase and export a promise that resolves when ready
+export const firebaseInit = initializeFirebase();
 
 // Export the initialized services
-export { app, analytics, auth, db, storage };
+export { app, auth, db, storage, analytics };
