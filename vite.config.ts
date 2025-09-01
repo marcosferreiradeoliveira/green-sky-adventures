@@ -32,7 +32,10 @@ export default defineConfig(({ mode }) => {
           chunkFileNames: `assets/[name]-[hash].js`,
           assetFileNames: `assets/[name]-[hash][extname]`
         }
-      }
+      },
+      // Ensure environment variables are included in the build
+      target: 'esnext',
+      minify: 'esbuild'
     },
     plugins: [
       react(),
@@ -43,8 +46,12 @@ export default defineConfig(({ mode }) => {
         "@": path.resolve(__dirname, "./src"),
       },
     },
-    // Explicitly define the environment variables we want to expose
+    // Explicitly define the environment variables
     define: {
+      'process.env': {
+        ...firebaseEnvVars,
+        NODE_ENV: mode
+      },
       'import.meta.env': {
         ...firebaseEnvVars,
         MODE: mode,
