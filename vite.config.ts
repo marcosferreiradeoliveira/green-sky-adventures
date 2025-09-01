@@ -5,12 +5,19 @@ import { componentTagger } from "lovable-tagger";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
-  // Load env file based on `mode` in the current working directory.
-  // Set the third parameter to '' to load all env regardless of the `VITE_` prefix.
+  // Load all env variables
   const env = loadEnv(mode, process.cwd(), '');
   
+  // Filter only the Firebase env vars to expose to client
+  const firebaseEnvVars = Object.entries(env)
+    .filter(([key]) => key.startsWith('VITE_FIREBASE_'))
+    .reduce((acc, [key, val]) => ({
+      ...acc,
+      [key]: val
+    }), {});
+  
   return {
-    base: mode === 'production' ? '/' : '/',
+    base: '/',
     server: {
       host: "::",
       port: 8080,
@@ -36,8 +43,14 @@ export default defineConfig(({ mode }) => {
         "@": path.resolve(__dirname, "./src"),
       },
     },
+    // Explicitly define the environment variables we want to expose
     define: {
-      'process.env': env
+      'import.meta.env': {
+        ...firebaseEnvVars,
+        MODE: mode,
+        DEV: mode === 'development',
+        PROD: mode === 'production'
+      }
     }
   };
 });
