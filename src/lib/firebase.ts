@@ -12,8 +12,7 @@ let db: Firestore;
 let storage: FirebaseStorage;
 
 async function getFirebaseConfig() {
-  // Use environment variables for both development and production
-  return {
+  const config = {
     apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
     authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
     projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
@@ -22,11 +21,23 @@ async function getFirebaseConfig() {
     appId: import.meta.env.VITE_FIREBASE_APP_ID,
     measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
   };
+
+  // Validate required config
+  const missingKeys = Object.entries(config)
+    .filter(([_, value]) => !value)
+    .map(([key]) => key);
+
+  if (missingKeys.length > 0) {
+    throw new Error(`Missing Firebase config values for: ${missingKeys.join(', ')}`);
+  }
+
+  return config;
 }
 
 export async function initializeFirebase() {
   try {
     if (getApps().length === 0) {
+      console.log('Initializing Firebase...');
       const firebaseConfig = await getFirebaseConfig();
       app = initializeApp(firebaseConfig);
       
@@ -36,22 +47,24 @@ export async function initializeFirebase() {
       storage = getStorage(app);
       
       // Initialize analytics if supported
-      if (await isSupported()) {
+      if (typeof window !== 'undefined' && await isSupported()) {
         analytics = getAnalytics(app);
+        console.log('Firebase Analytics initialized');
       }
+      console.log('Firebase initialized successfully');
     } else {
       app = getApp();
       auth = getAuth(app);
       db = getFirestore(app);
       storage = getStorage(app);
-      if (await isSupported()) {
+      if (typeof window !== 'undefined' && await isSupported()) {
         analytics = getAnalytics(app);
       }
     }
     
     return { app, auth, db, storage, analytics };
   } catch (error) {
-    console.error('Error initializing Firebase:', error);
+    console.error('Firebase initialization error:', error);
     throw error;
   }
 }
