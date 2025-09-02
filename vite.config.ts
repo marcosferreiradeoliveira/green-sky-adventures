@@ -1,63 +1,49 @@
-import { defineConfig, loadEnv } from "vite";
-import react from "@vitejs/plugin-react-swc";
-import path from "path";
-import { componentTagger } from "lovable-tagger";
+import { defineConfig, loadEnv } from 'vite'
+import react from '@vitejs/plugin-react'
+import path from 'path'
 
-// https://vitejs.dev/config/
-export default defineConfig(({ mode }) => {
-  // Load all env variables
-  const env = loadEnv(mode, process.cwd(), '');
+export default defineConfig(({ command, mode }) => {
+  // Carregar variáveis de ambiente
+  const env = loadEnv(mode, process.cwd(), '')
   
-  // Filter only the Firebase env vars to expose to client
-  const firebaseEnvVars = Object.entries(env)
-    .filter(([key]) => key.startsWith('VITE_FIREBASE_'))
-    .reduce((acc, [key, val]) => ({
-      ...acc,
-      [key]: val
-    }), {});
+  console.log(' Vite Config Debug:')
+  console.log('Mode:', mode)
+  console.log('Command:', command)
+  console.log('Firebase vars found:', Object.keys(env).filter(key => key.startsWith('VITE_FIREBASE')))
   
   return {
-    base: '/',
-    server: {
-      host: "::",
-      port: 8080,
-    },
-    build: {
-      outDir: 'dist',
-      assetsDir: 'assets',
-      sourcemap: mode === 'development',
-      rollupOptions: {
-        output: {
-          entryFileNames: `assets/[name]-[hash].js`,
-          chunkFileNames: `assets/[name]-[hash].js`,
-          assetFileNames: `assets/[name]-[hash][extname]`
-        }
-      },
-      // Ensure environment variables are included in the build
-      target: 'esnext',
-      minify: 'esbuild'
-    },
-    plugins: [
-      react(),
-      mode === 'development' && componentTagger(),
-    ].filter(Boolean),
+    plugins: [react()],
+    
+    // Add resolve configuration
     resolve: {
       alias: {
-        "@": path.resolve(__dirname, "./src"),
-      },
+        '@': path.resolve(__dirname, './src')
+      }
     },
-    // Explicitly define the environment variables
+    
+    // Garantir que as variáveis de ambiente sejam processadas
     define: {
-      'process.env': {
-        ...firebaseEnvVars,
-        NODE_ENV: mode
-      },
-      'import.meta.env': {
-        ...firebaseEnvVars,
-        MODE: mode,
-        DEV: mode === 'development',
-        PROD: mode === 'production'
+      // Definir explicitamente as variáveis para o bundle
+      'import.meta.env.VITE_FIREBASE_API_KEY': JSON.stringify(env.VITE_FIREBASE_API_KEY),
+      'import.meta.env.VITE_FIREBASE_AUTH_DOMAIN': JSON.stringify(env.VITE_FIREBASE_AUTH_DOMAIN),
+      'import.meta.env.VITE_FIREBASE_PROJECT_ID': JSON.stringify(env.VITE_FIREBASE_PROJECT_ID),
+      'import.meta.env.VITE_FIREBASE_STORAGE_BUCKET': JSON.stringify(env.VITE_FIREBASE_STORAGE_BUCKET),
+      'import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID': JSON.stringify(env.VITE_FIREBASE_MESSAGING_SENDER_ID),
+      'import.meta.env.VITE_FIREBASE_APP_ID': JSON.stringify(env.VITE_FIREBASE_APP_ID),
+      'import.meta.env.VITE_FIREBASE_MEASUREMENT_ID': JSON.stringify(env.VITE_FIREBASE_MEASUREMENT_ID),
+    },
+    
+    // Configurações de build
+    build: {
+      outDir: 'dist',
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            vendor: ['react', 'react-dom'],
+            firebase: ['firebase/app', 'firebase/auth', 'firebase/firestore']
+          }
+        }
       }
     }
-  };
-});
+  }
+})
