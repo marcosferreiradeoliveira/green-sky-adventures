@@ -67,7 +67,7 @@ const AddPilot = () => {
   if (checkingAdmin) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <span className="text-lg text-gray-600">Verificando permissões...</span>
+        <span className="text-lg text-gray-600">Verificando as permissões...</span>
       </div>
     );
   }
