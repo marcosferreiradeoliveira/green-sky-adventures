@@ -16,7 +16,7 @@ export default defineConfig(({ command, mode }) => {
   }
 
   // Processar apenas as variáveis necessárias para o cliente
-  const clientEnv = {}
+  const clientEnv: { [key: `import.meta.env.${string}`]: string } = {}
   const firebaseVars = [
     'VITE_FIREBASE_API_KEY',
     'VITE_FIREBASE_AUTH_DOMAIN',
