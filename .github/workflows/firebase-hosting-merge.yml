@@ -4,8 +4,7 @@
 name: Deploy to Firebase Hosting on merge
 on:
   push:
-    branches:
-      - main
+    branches: [main]
 
 jobs:
   build_and_deploy:
@@ -24,73 +23,21 @@ jobs:
       
       - name: Create .env file
         run: |
-          cat > .env <<EOL
-          VITE_FIREBASE_API_KEY=${{ secrets.VITE_FIREBASE_API_KEY }}
-          VITE_FIREBASE_AUTH_DOMAIN=${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
-          VITE_FIREBASE_PROJECT_ID=${{ secrets.VITE_FIREBASE_PROJECT_ID }}
-          VITE_FIREBASE_STORAGE_BUCKET=${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
-          VITE_FIREBASE_MESSAGING_SENDER_ID=${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
-          VITE_FIREBASE_APP_ID=${{ secrets.VITE_FIREBASE_APP_ID }}
-          VITE_FIREBASE_MEASUREMENT_ID=${{ secrets.VITE_FIREBASE_MEASUREMENT_ID }}
-          EOL
-        
-      - name: Debug Environment Variables
-        run: |
-          echo "Checking environment variables..."
-          if [ -f ".env" ]; then
-            echo " .env file exists"
-            echo "First few characters of API_KEY: $(head -n 1 .env | cut -d'=' -f2 | cut -c1-5)..."
-          else
-            echo " .env file not found!"
-          fi
+          echo "VITE_FIREBASE_API_KEY=${{ secrets.VITE_FIREBASE_API_KEY }}" > .env
+          echo "VITE_FIREBASE_AUTH_DOMAIN=${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}" >> .env
+          echo "VITE_FIREBASE_PROJECT_ID=${{ secrets.VITE_FIREBASE_PROJECT_ID }}" >> .env
+          echo "VITE_FIREBASE_STORAGE_BUCKET=${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}" >> .env
+          echo "VITE_FIREBASE_MESSAGING_SENDER_ID=${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}" >> .env
+          echo "VITE_FIREBASE_APP_ID=${{ secrets.VITE_FIREBASE_APP_ID }}" >> .env
+          echo "VITE_FIREBASE_MEASUREMENT_ID=${{ secrets.VITE_FIREBASE_MEASUREMENT_ID }}" >> .env
       
       - name: Build
-        run: |
-          echo " Building with environment variables..."
-          
-          echo "=== Environment check ==="
-          echo "Total VITE vars: $(env | grep VITE_FIREBASE | wc -l)"
-          echo "First var: $(env | grep VITE_FIREBASE | head -1 | cut -d= -f1)"
-          echo "========================="
-          
-          # Build do projeto
-          npm run build
-          
-          # Verificar se o build foi criado corretamente
-          echo "=== Build verification ==="
-          ls -la dist/
-          echo "Index.html exists: $([ -f dist/index.html ] && echo 'YES' || echo 'NO')"
-          echo "Assets folder: $([ -d dist/assets ] && echo 'YES' || echo 'NO')"
-          
-          # Verificar se as variáveis foram incluídas no bundle
-          if ls dist/assets/*.js 1> /dev/null 2>&1; then
-            echo "Checking if Firebase config is in bundle..."
-            if grep -q "$VITE_FIREBASE_PROJECT_ID" dist/assets/*.js; then
-              echo " Firebase config found in bundle"
-              echo "First few chars of API key in bundle: $(grep -o '"apiKey":"[^"]*' dist/assets/*.js | head -1 | cut -d'"' -f4 | cut -c1-5)..."
-            else
-              echo " Firebase config NOT found in bundle"
-              echo "=== Debug Info ==="
-              echo "Project ID being searched: $VITE_FIREBASE_PROJECT_ID"
-              echo "First few lines of bundle:"
-              head -n 20 $(ls dist/assets/*.js | head -1)
-              echo "=================="
-              exit 1
-            fi
-          else
-            echo " No JavaScript files found in dist/assets/"
-            exit 1
-          fi
-          echo "========================="
+        run: npm run build
+        env:
+          NODE_ENV: production
+      
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools
       
       - name: Deploy to Firebase
-        uses: FirebaseExtended/action-hosting-deploy@v0
-        with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_GREEN_SKY_B545B }}
-          channelId: live
-          projectId: green-sky-b545b
-          # IMPORTANTE: Usar o dist/ que já buildamos
-          entryPoint: .
-          # Se a action ainda tentar fazer build, podemos desabilitar
-          target: green-sky-b545b
+        run: firebase deploy --token "${{ secrets.FIREBASE_TOKEN }}" --project green-sky-b545b
