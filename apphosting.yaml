@@ -1,0 +1,44 @@
+# Firebase App Hosting Configuration
+# This file configures Firebase App Hosting deployment
+
+# Environment specification
+env: prod
+
+# Environment variables
+env_variables:
+  # Firebase Configuration
+  VITE_FIREBASE_API_KEY: "AIzaSyA56JZEDDDwuMIiTS2ijA9JQ_CoZfCXDyk"
+  VITE_FIREBASE_AUTH_DOMAIN: "green-sky-b545b.firebaseapp.com"
+  VITE_FIREBASE_PROJECT_ID: "green-sky-b545b"
+  VITE_FIREBASE_STORAGE_BUCKET: "green-sky-b545b.firebasestorage.app"
+  VITE_FIREBASE_MESSAGING_SENDER_ID: "714262247369"
+  VITE_FIREBASE_APP_ID: "1:714262247369:web:7e9742ebfe351255e59a18"
+  VITE_FIREBASE_MEASUREMENT_ID: "G-NPTGGJE6VK"
+
+# Build configuration
+build:
+  # Build command
+  command: npm run build
+  
+  # Output directory (relative to the project root)
+  output: dist
+
+# Runtime configuration
+runtime:
+  # Node.js version
+  nodeVersion: "18"
+
+# Required files to include in the deployment
+include:
+  - "**/*"
+
+exclude:
+  - "node_modules/**"
+  - ".git/**"
+  - ".github/**"
+  - ".firebase/**"
+  - ".firebaserc"
+  - "firebase.json"
+  - "firestore.*"
+  - "storage.rules"
+  - "database.rules.json"
