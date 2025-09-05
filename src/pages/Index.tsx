@@ -88,7 +88,7 @@ const Index = () => {
     }
   }, [safeSetState]);
 
-  // Efeito para carregar os pilotos quando o componente montar
+  // Efeito para carregar os pilotos quando o componente montara
   useEffect(() => {
     fetchPilots();
     
