@@ -11,15 +11,15 @@ let auth: Auth;
 let db: Firestore;
 let storage: FirebaseStorage;
 
-// Get Firebase config from environment variables
+// Get Firebase config from environment variables or use hardcoded values for production
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyA56JZEDDDwuMIiTS2ijA9JQ_CoZfCXDyk",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "green-sky-b545b.firebaseapp.com",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "green-sky-b545b",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "green-sky-b545b.firebasestorage.app",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "714262247369",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:714262247369:web:7e9742ebfe351255e59a18",
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-NPTGGJE6VK"
 };
 
 // Validate required config on client side
