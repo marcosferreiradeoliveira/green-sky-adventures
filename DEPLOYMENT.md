@@ -127,3 +127,4 @@ After successful deployment:
 4. Configure monitoring and analytics
 
 For more information, visit the [Firebase App Hosting documentation](https://firebase.google.com/docs/app-hosting).
+

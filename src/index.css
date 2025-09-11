@@ -81,3 +81,113 @@
 .hero-overlay {
   background: linear-gradient(135deg, rgba(0, 0, 0, 0.4) 0%, rgba(0, 0, 0, 0.2) 100%);
 }
+/* Adicione estas regras ao final do seu src/index.css */
+
+/* Correções específicas para iOS Safari */
+@supports (-webkit-touch-callout: none) {
+  :root {
+    --vh: 1vh;
+  }
+  
+  .min-h-screen {
+    min-height: 100vh;
+    min-height: calc(var(--vh, 1vh) * 100);
+  }
+  
+  /* Previne problemas de bounce scroll no iOS */
+  html, body {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  body {
+    /* Previne zoom em inputs no iOS */
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  #root {
+    width: 100%;
+    min-height: 100vh;
+    min-height: calc(var(--vh, 1vh) * 100);
+    overflow-x: hidden;
+  }
+  
+  /* Melhora performance de animações no iOS */
+  * {
+    -webkit-backface-visibility: hidden;
+    -webkit-perspective: 1000px;
+  }
+  
+  /* Otimizações para componentes com animações */
+  .animate-spin,
+  [class*="animate-"] {
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
+    will-change: transform;
+  }
+  
+  /* Previne seleção acidental de texto */
+  .select-none {
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+  }
+  
+  /* Melhora inputs no iOS */
+  input, textarea, select {
+    -webkit-appearance: none;
+    border-radius: 0;
+    font-size: 16px; /* Previne zoom automático */
+  }
+  
+  /* Botões otimizados para touch */
+  button, [role="button"] {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+}
+
+/* Fallback para dispositivos muito antigos */
+@media screen and (max-device-width: 480px) {
+  body {
+    font-size: 16px; /* Previne zoom em inputs */
+  }
+  
+  input {
+    font-size: 16px;
+  }
+}
+
+/* Loading spinner otimizado para iOS */
+@keyframes spin-optimized {
+  from {
+    -webkit-transform: rotate(0deg);
+    transform: rotate(0deg);
+  }
+  to {
+    -webkit-transform: rotate(360deg);
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin {
+  animation: spin-optimized 1s linear infinite;
+}
+
+/* Error boundary improvements para telas pequenas */
+@media (max-width: 640px) {
+  .error-boundary-container {
+    padding: 1rem;
+  }
+  
+  .error-boundary-container h1 {
+    font-size: 1.25rem;
+  }
+  
+  .error-boundary-container p {
+    font-size: 0.875rem;
+  }
+}

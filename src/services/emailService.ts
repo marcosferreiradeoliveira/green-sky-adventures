@@ -1,6 +1,15 @@
 import { httpsCallable, getFunctions } from 'firebase/functions';
-import { app } from '@/lib/firebase';
+import { getFirebase } from '@/lib/firebase';
 import { getAuth } from 'firebase/auth';
+
+let functions: ReturnType<typeof getFunctions>;
+
+// Initialize Firebase and get the functions instance
+const initializeEmailService = async () => {
+  const { app } = await getFirebase();
+  functions = getFunctions(app, 'southamerica-east1');
+  return functions;
+};
 
 interface SendGiftEmailParams {
   friendEmail: string;
@@ -10,14 +19,19 @@ interface SendGiftEmailParams {
   message?: string;
 }
 
-export const sendGiftEmail = async ({
+export async function sendGiftEmail({
   friendEmail,
   friendName = 'Amigo(a)',
   couponCode,
   senderName,
   message = ''
-}: SendGiftEmailParams) => {
+}: SendGiftEmailParams) {
   try {
+    // Ensure functions is initialized
+    if (!functions) {
+      functions = await initializeEmailService();
+    }
+    
     const currentAuth = getAuth();
     const user = currentAuth.currentUser;
     
@@ -28,10 +42,6 @@ export const sendGiftEmail = async ({
     // Get the user's display name or email as fallback
     const senderDisplayName = senderName || user.displayName || user.email?.split('@')[0] || 'Um amigo';
     
-    // Initialize Cloud Functions with the correct region
-    const functions = getFunctions(app, 'southamerica-east1');
-    
-    // Call the Cloud Function to send the email
     const sendGiftEmailFunction = httpsCallable(functions, 'sendGiftEmail');
     const result = await sendGiftEmailFunction({
       to: friendEmail,

@@ -46,3 +46,4 @@ else
     echo "❌ Deployment failed. Check the error messages above."
     exit 1
 fi
+

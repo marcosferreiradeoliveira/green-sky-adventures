@@ -84,8 +84,15 @@ export function trackEvent(eventName: string, params?: EventParams) {
   }
 }
 
-// Initialize Firebase and export a promise that resolves when ready
-export const firebaseInit = initializeFirebase();
+let isInitialized = false;
 
-// Export the initialized services
-export { app, auth, db, storage, analytics };
+export async function getFirebase() {
+  if (!isInitialized) {
+    await initializeFirebase();
+    isInitialized = true;
+  }
+  return { app, auth, db, storage, analytics };
+}
+
+// Export the initialized services with null checks
+export { auth, db, storage, analytics };
