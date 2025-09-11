@@ -5,6 +5,8 @@ import './index.css';
 import { initializeFirebase } from './lib/firebase';
 import ErrorBoundary from './components/ErrorBoundary';
 
+//
+
 // Loading component
 const LoadingScreen = () => (
   <div className="flex items-center justify-center min-h-screen bg-gray-50">
