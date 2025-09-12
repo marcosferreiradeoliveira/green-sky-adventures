@@ -5,7 +5,7 @@ import './index.css';
 import { initializeFirebase } from './lib/firebase';
 import ErrorBoundary from './components/ErrorBoundary';
 
-//
+///
 
 // Loading component
 const LoadingScreen = () => (
