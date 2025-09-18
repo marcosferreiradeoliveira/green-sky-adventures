@@ -6,9 +6,21 @@
       {
         "source": "**",
         "destination": "/index.html"
+      },
+      {
+        "source": "/sendGiftEmail",
+        "run": {
+          "serviceId": "api",
+          "region": "southamerica-east1"
+        }
+      },
+      {
+        "source": "**",
+        "destination": "/index.html"
       }
     ]
   },
+  
   "functions": {
     "source": "functions",
     "predeploy": [
