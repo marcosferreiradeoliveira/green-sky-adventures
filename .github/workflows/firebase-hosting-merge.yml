@@ -45,4 +45,4 @@ jobs:
         run: |
           echo "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > service-account.json
           export GOOGLE_APPLICATION_CREDENTIALS=service-account.json
-          firebase deploy --project green-sky-b545b
+          firebase deploy --only hosting --project green-sky-b545b
