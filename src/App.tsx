@@ -19,7 +19,7 @@ import MyFlights from "./pages/MyFlights";
 import EditarOferta from "./pages/EditarOferta";
 import ProfilePilot from "./pages/ProfilePilot";
 import NossoImpacto from "./pages/NossoImpacto";
-import BancoDeSonhos from "./pages/BancoDeSonhos";
+import BancoDeSonhos from './pages/BancodeSonhos';
 
 // Create QueryClient with stable configuration
 const queryClient = new QueryClient({

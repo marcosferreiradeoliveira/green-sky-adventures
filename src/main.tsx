@@ -58,7 +58,7 @@ const initApp = async () => {
 
     // Initialize Firebase with timeout
     const initWithTimeout = Promise.race([
-      initializeFirebase,
+      initializeFirebase(),
       new Promise((_, reject) => 
         setTimeout(() => reject(new Error('Firebase init timeout')), 5000)
       )

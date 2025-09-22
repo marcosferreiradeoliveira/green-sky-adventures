@@ -82,6 +82,12 @@ const Header = () => {
             >
               Nosso Impacto
             </a>
+            <a
+              className="text-gray-600 hover:text-greensky-600 transition-colors cursor-pointer"
+              onClick={e => { e.preventDefault(); navigate("/banco-de-sonhos"); }}
+            >
+              Banco de Sonhos
+            </a>
           </nav>
 
           <div className="flex items-center space-x-3 relative">
