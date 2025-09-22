@@ -1,12 +1,11 @@
 import { httpsCallable, getFunctions } from 'firebase/functions';
-import { getFirebase } from '@/lib/firebase';
+import { app } from '@/lib/firebase';
 import { getAuth } from 'firebase/auth';
 
 let functions: ReturnType<typeof getFunctions>;
 
 // Initialize Firebase and get the functions instance
 const initializeEmailService = async () => {
-  const { app } = await getFirebase();
   functions = getFunctions(app, 'southamerica-east1');
   return functions;
 };

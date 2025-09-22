@@ -5,12 +5,6 @@ import { getFirestore, Firestore } from "firebase/firestore";
 import { getStorage, FirebaseStorage } from "firebase/storage";
 import { Analytics, EventParams } from "firebase/analytics";
 
-let app: FirebaseApp;
-let analytics: Analytics | null = null;
-let auth: Auth;
-let db: Firestore;
-let storage: FirebaseStorage;
-
 // Get Firebase config from environment variables or use hardcoded values for production
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyA56JZEDDDwuMIiTS2ijA9JQ_CoZfCXDyk",
@@ -22,48 +16,32 @@ const firebaseConfig = {
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-NPTGGJE6VK"
 };
 
-// Validate required config on client side
-if (typeof window !== 'undefined') {
-  const missingKeys = Object.entries(firebaseConfig)
-    .filter(([_, value]) => !value)
-    .map(([key]) => key);
+// Initialize Firebase immediately
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
-  if (missingKeys.length > 0) {
-    console.error('Missing Firebase config values:', missingKeys);
-    throw new Error(`Missing Firebase config values: ${missingKeys.join(', ')}`);
-  }
-}
+// Initialize services
+export const auth = getAuth(app);
+export const db = getFirestore(app);
+export const storage = getStorage(app);
+
+// Initialize analytics
+let analytics: Analytics | null = null;
 
 export async function initializeFirebase() {
   try {
-    if (getApps().length === 0) {
-      console.log('Initializing Firebase...');
-      app = initializeApp(firebaseConfig);
-      
-      // Initialize services
-      auth = getAuth(app);
-      db = getFirestore(app);
-      storage = getStorage(app);
-      
-      // Initialize analytics if in browser and supported
-      if (typeof window !== 'undefined' && await isSupported()) {
-        analytics = getAnalytics(app);
-        console.log('Firebase Analytics initialized');
-      }
-      console.log('Firebase initialized successfully');
-    } else {
-      app = getApp();
-      auth = getAuth(app);
-      db = getFirestore(app);
-      storage = getStorage(app);
-      if (typeof window !== 'undefined' && await isSupported()) {
-        analytics = getAnalytics(app);
-      }
+    console.log('Firebase services initialized');
+    
+    // Initialize analytics if in browser and supported
+    if (typeof window !== 'undefined' && await isSupported()) {
+      analytics = getAnalytics(app);
+      console.log('Firebase Analytics initialized');
     }
+    
     return { app, auth, db, storage, analytics };
   } catch (error) {
     console.error('Firebase initialization error:', error);
-    throw error;
+    // Don't throw error, just log it to prevent app crashes
+    return { app, auth, db, storage, analytics: null };
   }
 }
 
@@ -84,15 +62,5 @@ export function trackEvent(eventName: string, params?: EventParams) {
   }
 }
 
-let isInitialized = false;
-
-export async function getFirebase() {
-  if (!isInitialized) {
-    await initializeFirebase();
-    isInitialized = true;
-  }
-  return { app, auth, db, storage, analytics };
-}
-
-// Export the initialized services with null checks
-export { auth, db, storage, analytics };
+// Export app for other services that need it
+export { app };
