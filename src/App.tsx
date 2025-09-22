@@ -19,6 +19,7 @@ import MyFlights from "./pages/MyFlights";
 import EditarOferta from "./pages/EditarOferta";
 import ProfilePilot from "./pages/ProfilePilot";
 import NossoImpacto from "./pages/NossoImpacto";
+import BancoDeSonhos from "./pages/BancoDeSonhos";
 
 // Create QueryClient with stable configuration
 const queryClient = new QueryClient({
@@ -83,6 +84,7 @@ const App = () => {
             <Route path="/editar-oferta" element={<EditarOferta />} />
             <Route path="/piloto/:id" element={<ProfilePilot />} />
             <Route path="/nosso-impacto" element={<NossoImpacto />} />
+            <Route path="/banco-de-sonhos" element={<BancoDeSonhos />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
