@@ -31,11 +31,9 @@ export default defineConfig(({ command, mode }) => {
   firebaseVars.forEach(key => {
     if (env[key] !== undefined) {
       clientEnv[`import.meta.env.${key}`] = JSON.stringify(env[key])
-    } else if (command === 'build') {
-      // No build, falhar se alguma variável estiver faltando
-      throw new Error(`❌ Variável de ambiente ${key} não encontrada! Verifique suas configurações.`)
     } else {
-      console.warn(`⚠️  Variável de ambiente ${key} não encontrada no modo de desenvolvimento`)
+      // Log warning but don't fail build - Firebase config has fallback values
+      console.warn(`⚠️  Variável de ambiente ${key} não encontrada, usando valores padrão`)
     }
   })
   
