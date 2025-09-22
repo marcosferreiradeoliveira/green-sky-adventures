@@ -1,87 +1,54 @@
-import { defineConfig, loadEnv } from 'vite'
+import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 
-export default defineConfig(({ command, mode }) => {
-  // Carregar variáveis de ambiente do .env e do ambiente
-  const env = loadEnv(mode, process.cwd(), '')
+export default defineConfig({
+  plugins: [react()],
   
-  // Log para depuração (só mostra no servidor de desenvolvimento)
-  if (command === 'serve') {
-    console.log('\n🔥 Vite Config Debug:')
-    console.log('Mode:', mode)
-    console.log('Command:', command)
-    console.log('Firebase vars found:', Object.keys(env).filter(key => key.startsWith('VITE_')))
-    console.log('\n')
-  }
-
-  // Processar apenas as variáveis necessárias para o cliente
-  const clientEnv: { [key: `import.meta.env.${string}`]: string } = {}
-  const firebaseVars = [
-    'VITE_FIREBASE_API_KEY',
-    'VITE_FIREBASE_AUTH_DOMAIN',
-    'VITE_FIREBASE_PROJECT_ID',
-    'VITE_FIREBASE_STORAGE_BUCKET',
-    'VITE_FIREBASE_MESSAGING_SENDER_ID',
-    'VITE_FIREBASE_APP_ID',
-    'VITE_FIREBASE_MEASUREMENT_ID'
-  ]
-
-  // Adicionar apenas as variáveis necessárias
-  firebaseVars.forEach(key => {
-    if (env[key] !== undefined) {
-      clientEnv[`import.meta.env.${key}`] = JSON.stringify(env[key])
-    } else {
-      // Log warning but don't fail build - Firebase config has fallback values
-      console.warn(`⚠️  Variável de ambiente ${key} não encontrada, usando valores padrão`)
+  // Configuração de aliases
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src')
     }
-  })
+  },
   
-  return {
-    plugins: [react()],
-    
-    // Configuração de aliases
-    resolve: {
-      alias: {
-        '@': path.resolve(__dirname, './src')
+  // Configurações de build otimizadas para evitar problemas de memória
+  build: {
+    outDir: 'dist',
+    // Remover manual chunks que podem causar problemas de memória
+    rollupOptions: {
+      output: {
+        // Deixar o Vite otimizar automaticamente os chunks
+        chunkFileNames: 'assets/[name]-[hash].js',
+        entryFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash].[ext]'
       }
     },
-    
-    // Definir variáveis de ambiente para o cliente
-    define: clientEnv,
-    
-    // Configurações de build
-    build: {
-      outDir: 'dist',
-      rollupOptions: {
-        output: {
-          manualChunks: {
-            vendor: ['react', 'react-dom'],
-            firebase: ['firebase/app', 'firebase/auth', 'firebase/firestore']
-          }
-        }
-      },
-      // Melhorar mensagens de erro
-      minify: 'esbuild',
-      sourcemap: mode !== 'production',
-      // Avisar sobre assets grandes
-      chunkSizeWarningLimit: 1000,
-      // Limpar a pasta de saída antes de construir
-      emptyOutDir: true
-    },
-    
-    // Configuração do servidor de desenvolvimento
-    server: {
-      port: 3000,
-      open: true,
-      // Habilitar CORS para desenvolvimento
-      cors: true
-    },
-    
-    // Pré-visualização de produção
-    preview: {
-      port: 5000,
-      open: true
-    }
+    // Configurações para otimizar memória
+    minify: 'esbuild',
+    sourcemap: false, // Desabilitar sourcemap para economizar memória
+    chunkSizeWarningLimit: 1000,
+    emptyOutDir: true,
+    // Configurar target para compatibilidade
+    target: 'esnext'
+  },
+  
+  // Configuração do servidor de desenvolvimento
+  server: {
+    port: 8080,
+    open: true,
+    cors: true
+  },
+  
+  // Pré-visualização de produção
+  preview: {
+    port: 5000,
+    open: true
+  },
+
+  // Otimizar dependências
+  optimizeDeps: {
+    include: ['react', 'react-dom', 'react-router-dom'],
+    exclude: ['firebase']
   }
 })
