@@ -71,8 +71,8 @@ const App = () => {
         <BrowserRouter>
           <PageViewTracker />
           <Routes>
-            <Route path="/" element={<BancoDeSonhos />} />
-            <Route path="/home" element={<Index />} />
+            <Route path="/" element={<Index />} />
+            <Route path="/banco-de-sonhos" element={<BancoDeSonhos />} />
             <Route path="/busca" element={<SearchResults />} />
             <Route path="/perfil" element={<Profile />} />
             <Route path="/admin" element={<AdminDashboard />} />
@@ -85,7 +85,6 @@ const App = () => {
             <Route path="/editar-oferta" element={<EditarOferta />} />
             <Route path="/piloto/:id" element={<ProfilePilot />} />
             <Route path="/nosso-impacto" element={<NossoImpacto />} />
-            <Route path="/banco-de-sonhos" element={<BancoDeSonhos />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
