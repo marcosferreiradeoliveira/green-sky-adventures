@@ -71,7 +71,8 @@ const App = () => {
         <BrowserRouter>
           <PageViewTracker />
           <Routes>
-            <Route path="/" element={<Index />} />
+            <Route path="/" element={<BancoDeSonhos />} />
+            <Route path="/home" element={<Index />} />
             <Route path="/busca" element={<SearchResults />} />
             <Route path="/perfil" element={<Profile />} />
             <Route path="/admin" element={<AdminDashboard />} />
