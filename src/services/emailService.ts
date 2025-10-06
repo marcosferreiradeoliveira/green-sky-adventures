@@ -59,7 +59,7 @@ export async function sendGiftEmail({
     let errorMessage = 'Não foi possível enviar o email. Tente novamente mais tarde.';
     
     if (error.code === 'permission-denied') {
-      errorMessage = 'Você não tem permissão para enviar este email.';
+      errorMessage = 'Você não tem permissão paraaa enviar este email.';
     } else if (error.code === 'unauthenticated') {
       errorMessage = 'Você precisa estar logado para enviar um presente.';
     } else if (error.details) {
