@@ -5,7 +5,11 @@ import './index.css';
 import { initializeFirebase } from './lib/firebase';
 import ErrorBoundary from './components/ErrorBoundary';
 
-///
+// Função de log para debug
+const debugLog = (message: string, data?: any) => {
+  const timestamp = new Date().toISOString();
+  console.log(`[${timestamp}] ${message}`, data || '');
+};
 
 // Loading component
 const LoadingScreen = () => (
@@ -42,52 +46,75 @@ const AppWithErrorBoundary = () => (
   </React.StrictMode>
 );
 
-// Initialize the app
+// Initialize the app with iOS-specific handling
 const initApp = async () => {
+  debugLog('1. Iniciando initApp');
   const rootElement = document.getElementById('root');
   if (!rootElement) {
-    console.error('Root element not found');
+    debugLog('ERRO: Elemento root não encontrado');
     return;
   }
 
-  const root = createRoot(rootElement);
+  // Create root only once and store it
+  debugLog('2. Criando root do React');
+  let root;
+  try {
+    root = createRoot(rootElement);
+    debugLog('3. Root do React criado com sucesso');
+  } catch (error) {
+    debugLog('ERRO ao criar root do React:', error);
+    return;
+  }
+
+  // Initial render with loading screen
+  debugLog('4. Renderizando tela de carregamento');
+  root.render(<LoadingScreen />);
 
   try {
-    // Show loading screen
-    root.render(<LoadingScreen />);
-
+    debugLog('5. Inicializando Firebase...');
     // Initialize Firebase with timeout
-    const initWithTimeout = Promise.race([
-      initializeFirebase(),
+    await Promise.race([
+      (async () => {
+        try {
+          await initializeFirebase();
+          debugLog('6. Firebase inicializado com sucesso');
+        } catch (firebaseError) {
+          debugLog('ERRO na inicialização do Firebase:', firebaseError);
+          throw firebaseError;
+        }
+      })(),
       new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Firebase init timeout')), 5000)
+        setTimeout(() => {
+          const error = new Error('Firebase init timeout');
+          debugLog('ERRO: Timeout na inicialização do Firebase');
+          reject(error);
+        }, 10000)
       )
     ]);
-
-    try {
-      await initWithTimeout;
-    } catch (error) {
-      console.warn('Firebase initialization warning:', error);
-      // Continue with app loading even if Firebase fails
-    }
-
-    // Small delay to prevent render conflicts on iOS
-    await new Promise(resolve => setTimeout(resolve, 100));
-
-    // Render the main app
-    root.render(<AppWithErrorBoundary />);
-
   } catch (error) {
-    console.error('App initialization error:', error);
-    root.render(<ErrorFallback />);
+    debugLog('AVISO: Firebase não inicializado corretamente, continuando...', error);
+    // Continue with app loading even if Firebase fails
   }
+
+  // Small delay to ensure everything is ready
+  debugLog('7. Aguardando delay final...');
+  await new Promise(resolve => setTimeout(resolve, 300));
+
+  // Final render with the app
+  debugLog('8. Renderizando aplicação principal');
+  try {
+    root.render(<AppWithErrorBoundary />);
+    debugLog('9. Aplicação renderizada com sucesso');
+  } catch (renderError) {
+    debugLog('ERRO CRÍTICO ao renderizar aplicação:', renderError);
+    throw renderError;
+  }
+  
+  return root; // Return the root for potential cleanup
 };
 
-// Start the app with error handling
-initApp().catch(error => {
-  console.error('Critical app error:', error);
-  
-  // Last resort fallback
+// Fallback error display function
+function showFallbackError() {
   const rootElement = document.getElementById('root');
   if (rootElement) {
     rootElement.innerHTML = `
@@ -102,4 +129,35 @@ initApp().catch(error => {
       </div>
     `;
   }
-});
+}
+
+// Initialize the app when DOM is ready
+const startApp = async () => {
+  debugLog('Iniciando aplicação...');
+  try {
+    await initApp();
+    debugLog('Aplicação inicializada com sucesso');
+  } catch (error) {
+    debugLog('ERRO CRÍTICO na aplicação:', error);
+    console.error('Critical app error:', error);
+    showFallbackError();
+  }
+};
+
+// Handle DOM ready state
+debugLog('Verificando estado do DOM...');
+if (document.readyState === 'loading') {
+  debugLog('DOM ainda não carregado, aguardando DOMContentLoaded');
+  document.addEventListener('DOMContentLoaded', () => {
+    debugLog('DOMContentLoaded disparado, iniciando aplicação...');
+    startApp().catch(err => {
+      debugLog('Erro ao iniciar aplicação após DOMContentLoaded:', err);
+    });
+  });
+} else {
+  // DOM already loaded
+  debugLog('DOM já carregado, iniciando aplicação imediatamente');
+  startApp().catch(err => {
+    debugLog('Erro ao iniciar aplicação:', err);
+  });
+}

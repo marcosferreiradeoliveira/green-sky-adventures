@@ -2,6 +2,50 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
   <head>
+    <script>
+      // Script de inicialização para debug
+      (function() {
+        window.__GREEN_SKY_DEBUG__ = {
+          initTime: Date.now(),
+          logs: [],
+          log: function(message, data) {
+            const entry = {
+              time: Date.now() - this.initTime,
+              message: message,
+              data: data
+            };
+            this.logs.push(entry);
+            console.log(`[${entry.time}ms] ${message}`, data || '');
+            return entry;
+          }
+        };
+        
+        // Log inicial
+        window.__GREEN_SKY_DEBUG__.log('1. Script de inicialização carregado', {
+          readyState: document.readyState,
+          location: window.location.href
+        });
+
+        // Captura de erros globais
+        window.addEventListener('error', function(event) {
+          window.__GREEN_SKY_DEBUG__.log('ERRO GLOBAL', {
+            message: event.message,
+            source: event.filename,
+            line: event.lineno,
+            col: event.colno,
+            error: event.error
+          });
+        });
+
+        // Captura de rejeições não tratadas de promises
+        window.addEventListener('unhandledrejection', function(event) {
+          window.__GREEN_SKY_DEBUG__.log('ERRO DE PROMISE NÃO TRATADO', {
+            reason: event.reason,
+            error: event.reason?.stack || event.reason
+          });
+        });
+      })();
+    </script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>Green Sky - Voe com Aventura, Voe com Propósito</title>
