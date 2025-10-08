@@ -1,11 +1,16 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Heart, Search, Filter, Plane, TreePine, GraduationCap, Hospital, Home, HandHeart } from "lucide-react";
+import { Heart, Search, Plane, TreePine, GraduationCap, Hospital, Home, HandHeart } from "lucide-react";
 
 const BancoDeSonhos = () => {
+  // Debug: Log component mount
+  useEffect(() => {
+    console.log('BancoDeSonhos component mounted');
+    return () => console.log('BancoDeSonhos component unmounted');
+  }, []);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("todas");
 
@@ -87,12 +92,16 @@ const BancoDeSonhos = () => {
     }
   ];
 
-  const filteredOrganizations = organizations.filter(org => {
-    const matchesSearch = org.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         org.description.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = selectedCategory === "todas" || org.category === selectedCategory;
-    return matchesSearch && matchesCategory;
-  });
+  // Memoize the filtered organizations to prevent unnecessary recalculations
+  const filteredOrganizations = useCallback(() => {
+    console.log('Filtering organizations...');
+    return organizations.filter(org => {
+      const matchesSearch = org.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          org.description.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesCategory = selectedCategory === "todas" || org.category === selectedCategory;
+      return matchesSearch && matchesCategory;
+    });
+  }, [searchTerm, selectedCategory]);
 
   const handleDonate = (orgId: number, points: number) => {
     // Aqui seria implementada a lógica de doação
@@ -158,7 +167,7 @@ const BancoDeSonhos = () => {
 
         {/* Organizations Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredOrganizations.map((org) => (
+          {filteredOrganizations().map((org) => (
             <Card key={org.id} className={`${org.color} border-2 hover:shadow-lg transition-all duration-300 hover:-translate-y-1 overflow-hidden`}>
               <CardHeader className="text-center pb-4">
                 <div className="text-6xl mb-4">{org.logo}</div>
@@ -199,7 +208,7 @@ const BancoDeSonhos = () => {
           ))}
         </div>
 
-        {filteredOrganizations.length === 0 && (
+        {filteredOrganizations().length === 0 && (
           <div className="text-center py-12">
             <div className="text-6xl mb-4">🔍</div>
             <h3 className="text-xl font-semibold text-gray-800 mb-2">
