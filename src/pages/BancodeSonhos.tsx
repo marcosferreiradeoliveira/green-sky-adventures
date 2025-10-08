@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -173,7 +173,8 @@ const BancoDeSonhos = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-hero">
+    <BancoDeSonhosErrorBoundary>
+      <div className="min-h-screen bg-gradient-hero">
       {/* Header */}
       <div className="bg-white shadow-sm">
         <div className="container mx-auto px-4 py-8">
@@ -301,7 +302,7 @@ const BancoDeSonhos = () => {
         </div>
       </div>
     </div>
-      </BancoDeSonhosErrorBoundary>
+  </BancoDeSonhosErrorBoundary>
   );
 };
 
