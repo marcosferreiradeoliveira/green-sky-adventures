@@ -1,3 +1,16 @@
+console.log('[MAIN] Iniciando o bundle principal');
+
+// Handler para erros de carregamento de módulos
+window.addEventListener('error', (event) => {
+  const target = event.target as (HTMLLinkElement | HTMLScriptElement | HTMLImageElement);
+  if (target.tagName) {
+    console.error(`[MODULE ERROR] Falha ao carregar ${target.tagName}:`, {
+      src: target.src || target.href,
+      error: event.error || 'Erro desconhecido'
+    });
+  }
+}, true);
+
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
@@ -5,10 +18,18 @@ import './index.css';
 import { initializeFirebase } from './lib/firebase';
 import ErrorBoundary from './components/ErrorBoundary';
 
+console.log('[MAIN] Módulos principais importados');
+
 // Função de log para debug
 const debugLog = (message: string, data?: any) => {
   const timestamp = new Date().toISOString();
   console.log(`[${timestamp}] ${message}`, data || '');
+};
+
+// Adiciona um handler para erros síncronos não capturados
+window.onerror = function(message, source, lineno, colno, error) {
+  debugLog('ERRO GLOBAL SÍNCRONO', { message, source, lineno, colno, error });
+  return true; // Previne o comportamento padrão do navegador
 };
 
 // Loading component
