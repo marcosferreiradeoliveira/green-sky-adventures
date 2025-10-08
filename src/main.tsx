@@ -5,7 +5,7 @@ window.addEventListener('error', (event) => {
   const target = event.target as (HTMLLinkElement | HTMLScriptElement | HTMLImageElement);
   if (target.tagName) {
     console.error(`[MODULE ERROR] Falha ao carregar ${target.tagName}:`, {
-      src: target.src || target.href,
+      src: 'src' in target ? target.src : target.href || 'unknown',
       error: event.error || 'Erro desconhecido'
     });
   }
