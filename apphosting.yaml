@@ -2,7 +2,8 @@
 # This file configures Firebase App Hosting deployment
 
 # Environment specification
-env: prod
+environment:
+  type: prod
 
 # Environment variables
 env_variables:
