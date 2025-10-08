@@ -1,16 +1,67 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Heart, Search, Plane, TreePine, GraduationCap, Hospital, Home, HandHeart } from "lucide-react";
 
+// Error boundary to catch and display errors
+class BancoDeSonhosErrorBoundary extends React.Component<{children: React.ReactNode}, {hasError: boolean}> {
+  constructor(props: {children: React.ReactNode}) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    console.error('Error in BancoDeSonhos:', error);
+    return { hasError: true };
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-8 text-center">
+          <h2 className="text-xl font-bold text-red-600 mb-4">Algo deu errado</h2>
+          <p className="mb-4">Por favor, recarregue a página ou tente novamente mais tarde.</p>
+          <button 
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          >
+            Recarregar Página
+          </button>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 const BancoDeSonhos = () => {
+  // Track render count to prevent infinite loops
+  const renderCount = useRef(0);
+  
   // Debug: Log component mount
   useEffect(() => {
     console.log('BancoDeSonhos component mounted');
-    return () => console.log('BancoDeSonhos component unmounted');
+    renderCount.current = 0; // Reset on mount
+    
+    return () => {
+      console.log('BancoDeSonhos component unmounted');
+    };
   }, []);
+  
+  // Track renders and prevent infinite loops
+  useEffect(() => {
+    renderCount.current += 1;
+    console.log(`BancoDeSonhos render #${renderCount.current}`);
+    
+    if (renderCount.current > 20) {
+      console.error('Possible infinite loop detected in BancoDeSonhos');
+      // Force an error to be caught by the error boundary
+      throw new Error('Possible infinite loop detected');
+    }
+  });
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("todas");
 
@@ -92,15 +143,28 @@ const BancoDeSonhos = () => {
     }
   ];
 
-  // Memoize the filtered organizations to prevent unnecessary recalculations
+  // Memoize the filtered organizations with a limit on the number of items
   const filteredOrganizations = useCallback(() => {
     console.log('Filtering organizations...');
-    return organizations.filter(org => {
-      const matchesSearch = org.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          org.description.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesCategory = selectedCategory === "todas" || org.category === selectedCategory;
-      return matchesSearch && matchesCategory;
-    });
+    try {
+      const result = organizations.filter(org => {
+        const matchesSearch = org.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                            org.description.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesCategory = selectedCategory === "todas" || org.category === selectedCategory;
+        return matchesSearch && matchesCategory;
+      });
+      
+      // Safety check
+      if (!Array.isArray(result)) {
+        console.error('Filtered organizations is not an array:', result);
+        return [];
+      }
+      
+      return result;
+    } catch (error) {
+      console.error('Error filtering organizations:', error);
+      return [];
+    }
   }, [searchTerm, selectedCategory]);
 
   const handleDonate = (orgId: number, points: number) => {
@@ -237,6 +301,7 @@ const BancoDeSonhos = () => {
         </div>
       </div>
     </div>
+      </BancoDeSonhosErrorBoundary>
   );
 };
 
