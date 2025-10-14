@@ -9,32 +9,65 @@ export default defineConfig(({ mode }) => ({
     mode === 'development' && componentTagger(),
   ].filter(Boolean),
   
-  // Configuração de aliases
-  resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './src')
-    }
-  },
-  
-  // Configurações de build otimizadas para evitar problemas de memória
   build: {
     outDir: 'dist',
-    // Remover manual chunks que podem causar problemas de memória
     rollupOptions: {
+      input: './index.html',
       output: {
-        // Deixar o Vite otimizar automaticamente os chunks
+        // Chunks muito menores para iOS - dividir em mais partes
+        manualChunks: (id) => {
+          // React core
+          if (id.includes('react') && !id.includes('react-dom')) {
+            return 'react-core';
+          }
+          // React DOM
+          if (id.includes('react-dom')) {
+            return 'react-dom';
+          }
+          // Router
+          if (id.includes('react-router')) {
+            return 'router';
+          }
+          // Firebase
+          if (id.includes('firebase')) {
+            return 'firebase';
+          }
+          // Radix UI components
+          if (id.includes('@radix-ui')) {
+            return 'radix-ui';
+          }
+          // Lucide icons
+          if (id.includes('lucide-react')) {
+            return 'icons';
+          }
+          // TanStack Query
+          if (id.includes('@tanstack')) {
+            return 'tanstack';
+          }
+          // Node modules
+          if (id.includes('node_modules')) {
+            return 'vendor';
+          }
+        },
         chunkFileNames: 'assets/[name]-[hash].js',
         entryFileNames: 'assets/[name]-[hash].js',
         assetFileNames: 'assets/[name]-[hash].[ext]'
       }
     },
-    // Configurações para otimizar memória
+    // Configurações para otimizar memória e compatibilidade iOS
     minify: 'esbuild',
     sourcemap: false, // Desabilitar sourcemap para economizar memória
-    chunkSizeWarningLimit: 1000,
+    chunkSizeWarningLimit: 500, // Reduzir limite para chunks menores
     emptyOutDir: true,
-    // Configurar target para compatibilidade
-    target: 'esnext'
+    // Configurar target para compatibilidade com iOS Safari
+    target: ['es2015', 'safari12'] // Compatibilidade com iOS Safari
+  },
+  
+  // Configuração de aliases
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src')
+    }
   },
   
   // Configuração do servidor de desenvolvimento

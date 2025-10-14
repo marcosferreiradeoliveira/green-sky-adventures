@@ -3,11 +3,27 @@
 <html lang="pt-BR">
   <head>
     <script>
-      // Script de inicialização para debug
+      // Script de inicialização para debug e proteção iOS
       (function() {
+        // Detecção iOS melhorada
+        const isIOSDevice = function() {
+          return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+                 (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        };
+        
+        // Detecção de stack overflow
+        const isStackOverflowError = function(error) {
+          return error && (
+            error.message?.toLowerCase().includes('maximum call stack') ||
+            error.name === 'RangeError' ||
+            (error.stack && error.stack.includes('evaluate'))
+          );
+        };
+        
         window.__GREEN_SKY_DEBUG__ = {
           initTime: Date.now(),
           logs: [],
+          isIOS: isIOSDevice(),
           log: function(message, data) {
             const entry = {
               time: Date.now() - this.initTime,
@@ -23,27 +39,112 @@
         // Log inicial
         window.__GREEN_SKY_DEBUG__.log('1. Script de inicialização carregado', {
           readyState: document.readyState,
-          location: window.location.href
+          location: window.location.href,
+          isIOS: window.__GREEN_SKY_DEBUG__.isIOS,
+          userAgent: navigator.userAgent
         });
 
-        // Captura de erros globais
+        // Captura de erros globais com tratamento específico para iOS
         window.addEventListener('error', function(event) {
-          window.__GREEN_SKY_DEBUG__.log('ERRO GLOBAL', {
+          const errorData = {
             message: event.message,
             source: event.filename,
             line: event.lineno,
             col: event.colno,
             error: event.error
-          });
+          };
+          
+          window.__GREEN_SKY_DEBUG__.log('ERRO GLOBAL', errorData);
+          
+          // Tratamento específico para stack overflow no iOS
+          if (window.__GREEN_SKY_DEBUG__.isIOS && isStackOverflowError(event.error)) {
+            window.__GREEN_SKY_DEBUG__.log('STACK OVERFLOW DETECTADO NO iOS - TENTANDO RECUPERAR', errorData);
+            
+            // Previne múltiplas tentativas de recuperação
+            if (window.__IOS_RECOVERY_ATTEMPTED__) {
+              return;
+            }
+            window.__IOS_RECOVERY_ATTEMPTED__ = true;
+            
+            // Aguarda um pouco e recarrega
+            setTimeout(function() {
+              window.__GREEN_SKY_DEBUG__.log('RECARREGANDO PÁGINA APÓS STACK OVERFLOW');
+              window.location.reload();
+            }, 1000);
+          }
         });
 
         // Captura de rejeições não tratadas de promises
         window.addEventListener('unhandledrejection', function(event) {
-          window.__GREEN_SKY_DEBUG__.log('ERRO DE PROMISE NÃO TRATADO', {
+          const errorData = {
             reason: event.reason,
             error: event.reason?.stack || event.reason
-          });
+          };
+          
+          window.__GREEN_SKY_DEBUG__.log('ERRO DE PROMISE NÃO TRATADO', errorData);
+          
+          // Tratamento para promises com stack overflow
+          if (window.__GREEN_SKY_DEBUG__.isIOS && isStackOverflowError(event.reason)) {
+            window.__GREEN_SKY_DEBUG__.log('STACK OVERFLOW EM PROMISE NO iOS', errorData);
+            event.preventDefault(); // Previne o erro de ser logado no console
+          }
         });
+        
+        // Proteção adicional: intercepta erros de carregamento de módulos
+        if (window.__GREEN_SKY_DEBUG__.isIOS) {
+          // Override do console.error para capturar erros de módulos
+          const originalConsoleError = console.error;
+          console.error = function(...args) {
+            const message = args.join(' ');
+            if (message.includes('Maximum call stack size exceeded') || 
+                message.includes('RangeError')) {
+              window.__GREEN_SKY_DEBUG__.log('STACK OVERFLOW DETECTADO VIA CONSOLE', { message: message });
+              
+              if (!window.__IOS_RECOVERY_ATTEMPTED__) {
+                window.__IOS_RECOVERY_ATTEMPTED__ = true;
+                setTimeout(function() {
+                  window.location.reload();
+                }, 500);
+                return;
+              }
+            }
+            originalConsoleError.apply(console, args);
+          };
+          
+          // Para iOS, carregar módulos de forma mais segura
+          window.__GREEN_SKY_DEBUG__.log('iOS detectado - configurando carregamento seguro');
+          
+          // Intercepta o carregamento do script principal
+          const originalCreateElement = document.createElement;
+          document.createElement = function(tagName) {
+            const element = originalCreateElement.call(document, tagName);
+            
+            if (tagName.toLowerCase() === 'script' && element.src && element.src.includes('index-')) {
+              window.__GREEN_SKY_DEBUG__.log('Interceptando carregamento do script principal');
+              
+              // Adiciona atributos para carregamento mais seguro
+              element.setAttribute('defer', '');
+              element.setAttribute('async', '');
+              
+              // Adiciona timeout para o script
+              element.onload = function() {
+                window.__GREEN_SKY_DEBUG__.log('Script principal carregado com sucesso');
+              };
+              
+              element.onerror = function() {
+                window.__GREEN_SKY_DEBUG__.log('Erro ao carregar script principal');
+                if (!window.__IOS_RECOVERY_ATTEMPTED__) {
+                  window.__IOS_RECOVERY_ATTEMPTED__ = true;
+                  setTimeout(function() {
+                    window.location.reload();
+                  }, 1000);
+                }
+              };
+            }
+            
+            return element;
+          };
+        }
       })();
     </script>
     <meta charset="UTF-8" />
@@ -78,6 +179,37 @@
 
   <body>
     <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+    <script>
+      // Carregamento condicional baseado na detecção iOS
+      (function() {
+        const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+                           (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        
+        if (window.__GREEN_SKY_DEBUG__) {
+          window.__GREEN_SKY_DEBUG__.log('Decidindo estratégia de carregamento', { 
+            isIOS: isIOSDevice,
+            strategy: isIOSDevice ? 'vanilla-loader' : 'es6-modules'
+          });
+        }
+        
+        if (isIOSDevice) {
+          // Para iOS, usar carregador vanilla JavaScript
+          console.log('[HTML] iOS detectado, carregando versão vanilla');
+          
+          const script = document.createElement('script');
+          script.src = '/ios-loader.js';
+          script.type = 'text/javascript';
+          document.head.appendChild(script);
+        } else {
+          // Para outros dispositivos, usar módulos ES6 normais
+          console.log('[HTML] Dispositivo não-iOS, carregando módulos ES6');
+          
+          const script = document.createElement('script');
+          script.type = 'module';
+          script.src = '/src/main.tsx';
+          document.head.appendChild(script);
+        }
+      })();
+    </script>
   </body>
 </html>
