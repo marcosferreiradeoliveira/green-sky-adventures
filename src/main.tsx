@@ -17,6 +17,7 @@ import App from './App.tsx';
 import './index.css';
 import { initializeFirebase } from './lib/firebase';
 import ErrorBoundary from './components/ErrorBoundary';
+import { initIOSFixes, isIOS, isStackOverflowError } from './lib/ios-fixes';
 
 console.log('[MAIN] Módulos principais importados');
 
@@ -29,6 +30,18 @@ const debugLog = (message: string, data?: any) => {
 // Adiciona um handler para erros síncronos não capturados
 window.onerror = function(message, source, lineno, colno, error) {
   debugLog('ERRO GLOBAL SÍNCRONO', { message, source, lineno, colno, error });
+  
+  // Check if it's a stack overflow error on iOS
+  if (isIOS() && error && isStackOverflowError(error)) {
+    debugLog('ERRO DE STACK OVERFLOW DETECTADO NO iOS', { message, source, lineno, colno });
+    // Try to recover by reloading the page after a short delay
+    setTimeout(() => {
+      debugLog('Tentando recuperar do stack overflow...');
+      window.location.reload();
+    }, 1000);
+    return true;
+  }
+  
   return true; // Previne o comportamento padrão do navegador
 };
 
@@ -70,6 +83,20 @@ const AppWithErrorBoundary = () => (
 // Initialize the app with iOS-specific handling
 const initApp = async () => {
   debugLog('1. Iniciando initApp');
+  
+  // Apply iOS fixes immediately if on iOS
+  if (isIOS()) {
+    debugLog('iOS detectado, aplicando correções específicas...');
+    try {
+      const cleanupIOSFixes = initIOSFixes();
+      // Store cleanup function globally for potential use
+      (window as any).__IOS_CLEANUP__ = cleanupIOSFixes;
+      debugLog('Correções iOS aplicadas com sucesso');
+    } catch (error) {
+      debugLog('Erro ao aplicar correções iOS:', error);
+    }
+  }
+  
   const rootElement = document.getElementById('root');
   if (!rootElement) {
     debugLog('ERRO: Elemento root não encontrado');

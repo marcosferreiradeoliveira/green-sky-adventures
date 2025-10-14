@@ -191,3 +191,28 @@
     font-size: 0.875rem;
   }
 }
+
+/* Correções adicionais para prevenir stack overflow no iOS */
+@supports (-webkit-touch-callout: none) {
+  /* Otimizações de performance para evitar reflows custosos */
+  * {
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
+  }
+  
+  /* Previne problemas de layout que podem causar loops infinitos */
+  .container {
+    contain: layout style paint;
+  }
+  
+  /* Otimizações específicas para React components */
+  [data-reactroot] {
+    contain: layout style;
+  }
+  
+  /* Melhora performance de scroll e touch events */
+  .overflow-auto, .overflow-scroll {
+    -webkit-overflow-scrolling: touch;
+    contain: scroll;
+  }
+}

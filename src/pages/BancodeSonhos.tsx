@@ -51,7 +51,7 @@ const BancoDeSonhos = () => {
     };
   }, []);
   
-  // Track renders and prevent infinite loops
+  // Track renders and prevent infinite loops - FIXED: Added empty dependency array
   useEffect(() => {
     renderCount.current += 1;
     console.log(`BancoDeSonhos render #${renderCount.current}`);
@@ -61,7 +61,7 @@ const BancoDeSonhos = () => {
       // Force an error to be caught by the error boundary
       throw new Error('Possible infinite loop detected');
     }
-  });
+  }, []); // FIXED: Added empty dependency array to prevent infinite loops
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("todas");
 

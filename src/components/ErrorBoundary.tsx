@@ -1,4 +1,5 @@
 import React, { Component, ReactNode } from 'react';
+import { isIOS, isStackOverflowError } from '@/lib/ios-fixes';
 
 interface Props {
   children: ReactNode;
@@ -35,6 +36,15 @@ class ErrorBoundary extends Component<Props, State> {
     // Prevent infinite loops by limiting error logging
     if (this.state.retryCount < 3) {
       console.error('ErrorBoundary caught an error:', error, errorInfo);
+      
+      // Special handling for stack overflow errors on iOS
+      if (isIOS() && isStackOverflowError(error)) {
+        console.error('Stack overflow error detected on iOS, attempting recovery...');
+        // Force a page reload for stack overflow errors on iOS
+        setTimeout(() => {
+          window.location.reload();
+        }, 1000);
+      }
       
       this.setState(prevState => ({
         error,
